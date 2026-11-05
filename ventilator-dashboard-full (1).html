@@ -1,0 +1,1871 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>Ventilator Dashboard — Full Prototype</title>
+
+  <!-- Tailwind CDN (demo). Production me build version use karo. -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js for trend graphs -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- jsPDF for PDF reports -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            panel: "#0f172a",
+            card: "#111827",
+            line: "#1f2937",
+            crit: "#ef4444",
+            warn: "#f59e0b",
+            ok: "#10b981"
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    .theme-light body, body.theme-light { background: #f1f5f9; color: #0f172a; }
+    .theme-light .card-light { background: #ffffff; border-color: #e2e8f0; color: #0f172a; }
+    .pulse-crit { animation: pulseC 1s infinite; }
+    @keyframes pulseC { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .modal-back { background: rgba(2,6,23,0.7); backdrop-filter: blur(4px); }
+    .glow { box-shadow: 0 0 0 1px rgba(56,189,248,0.4), 0 0 24px rgba(56,189,248,0.15); }
+  </style>
+</head>
+
+<body class="bg-slate-950 text-slate-100 antialiased">
+
+  <!-- ==================== PIN LOCK SCREEN ==================== -->
+  <div id="lockScreen" class="fixed inset-0 z-[100] grid place-items-center bg-slate-950 px-6">
+    <div class="w-full max-w-sm rounded-3xl border border-slate-800 bg-slate-900 p-6">
+      <div class="text-center">
+        <div class="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-sky-500/10 text-sky-300">
+          <svg viewBox="0 0 24 24" class="h-7 w-7" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 1l3 6 6 1-4.5 4 1 6L12 15l-5.5 3 1-6L3 8l6-1z"/>
+          </svg>
+        </div>
+        <h2 class="text-lg font-bold">Ventilator Control</h2>
+        <p class="mt-1 text-xs text-slate-400">Clinician access only. PIN enter karo.</p>
+        <p class="mt-1 text-[10px] text-amber-300/80">Demo PIN: 1234</p>
+      </div>
+      <div id="pinDots" class="mt-5 flex justify-center gap-3">
+        <div class="pin-dot h-3 w-3 rounded-full border border-slate-600"></div>
+        <div class="pin-dot h-3 w-3 rounded-full border border-slate-600"></div>
+        <div class="pin-dot h-3 w-3 rounded-full border border-slate-600"></div>
+        <div class="pin-dot h-3 w-3 rounded-full border border-slate-600"></div>
+      </div>
+      <div id="pinError" class="mt-3 hidden text-center text-xs text-red-300">Incorrect PIN. Try 1234.</div>
+      <div class="mt-5 grid grid-cols-3 gap-3">
+        <button class="pin-key grid h-14 place-items-center rounded-2xl border border-slate-700 bg-slate-800 text-xl font-bold" data-k="1">1</button>
+        <button class="pin-key grid h-14 place-items-center rounded-2xl border border-slate-700 bg-slate-800 text-xl font-bold" data-k="2">2</button>
+        <button class="pin-key grid h-14 place-items-center rounded-2xl border border-slate-700 bg-slate-800 text-xl font-bold" data-k="3">3</button>
+        <button class="pin-key grid h-14 place-items-center rounded-2xl border border-slate-700 bg-slate-800 text-xl font-bold" data-k="4">4</button>
+        <button class="pin-key grid h-14 place-items-center rounded-2xl border border-slate-700 bg-slate-800 text-xl font-bold" data-k="5">5</button>
+        <button class="pin-key grid h-14 place-items-center rounded-2xl border border-slate-700 bg-slate-800 text-xl font-bold" data-k="6">6</button>
+        <button class="pin-key grid h-14 place-items-center rounded-2xl border border-slate-700 bg-slate-800 text-xl font-bold" data-k="7">7</button>
+        <button class="pin-key grid h-14 place-items-center rounded-2xl border border-slate-700 bg-slate-800 text-xl font-bold" data-k="8">8</button>
+        <button class="pin-key grid h-14 place-items-center rounded-2xl border border-slate-700 bg-slate-800 text-xl font-bold" data-k="9">9</button>
+        <button class="pin-key grid h-14 place-items-center rounded-2xl border border-slate-700 bg-slate-800 text-sm font-semibold" data-k="clear">CLR</button>
+        <button class="pin-key grid h-14 place-items-center rounded-2xl border border-slate-700 bg-slate-800 text-xl font-bold" data-k="0">0</button>
+        <button class="pin-key grid h-14 place-items-center rounded-2xl border border-slate-700 bg-slate-800 text-sm font-semibold" data-k="del">DEL</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MAIN APP ==================== -->
+  <div id="app" class="hidden">
+    <div class="mx-auto max-w-md min-h-screen pb-28">
+
+      <!-- HEADER -->
+      <header class="sticky top-0 z-40 border-b border-slate-800 bg-slate-950/90 px-4 py-3 backdrop-blur">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <div class="text-[10px] font-semibold tracking-[0.22em] text-amber-300">PROTOTYPE MONITORING UI</div>
+            <h1 class="text-lg font-bold leading-tight" id="deviceId">VENT-STM32-01</h1>
+            <p class="text-xs text-slate-400">Session: <span id="sessionId">SES-000000</span> · Op: <span id="operatorId">—</span></p>
+          </div>
+          <div class="text-right space-y-1">
+            <div class="flex justify-end gap-1 text-[10px]">
+              <span id="bleBadge" class="rounded-full border border-slate-700 bg-slate-900 px-2 py-1 text-slate-300">BLE: --</span>
+              <span id="wifiBadge" class="rounded-full border border-slate-700 bg-slate-900 px-2 py-1 text-slate-300">Wi-Fi: --</span>
+              <span id="audioBadge" class="rounded-full border border-slate-700 bg-slate-900 px-2 py-1 text-slate-300">🔇</span>
+            </div>
+            <div class="text-sm font-semibold">
+              <span id="batteryPercent">--</span>% · <span id="batteryPercentText" class="text-slate-400 text-[10px]"></span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- SCENARIO + MODE STRIP -->
+      <div class="sticky top-[88px] z-30 flex gap-2 border-b border-slate-800 bg-slate-950/95 px-4 py-2 backdrop-blur text-xs">
+        <button id="scenarioBtn" class="flex-1 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 font-semibold text-slate-200">
+          🩺 <span id="scenarioName">Normal Adult</span>
+        </button>
+        <button id="modeBtn" class="flex-1 rounded-xl border border-sky-700/40 bg-sky-500/10 px-3 py-2 font-semibold text-sky-300">
+          ⚙️ <span id="modeName">CMV</span>
+        </button>
+      </div>
+
+      <!-- ALARM BANNER -->
+      <div id="alarmBanner" class="mx-4 mt-4 hidden rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3">
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex-1">
+            <div class="flex items-center gap-2">
+              <span class="pulse-crit inline-block h-2 w-2 rounded-full bg-red-400"></span>
+              <div class="text-sm font-bold text-red-300" id="alarmTitle">CRITICAL ALARM</div>
+            </div>
+            <div class="mt-1 text-xs text-red-200/80" id="alarmText">Simulated alarm</div>
+          </div>
+          <button id="ackAlarmBtn" class="rounded-xl border border-red-400/40 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200">ACK</button>
+        </div>
+      </div>
+
+      <main class="mt-4 space-y-4 px-4">
+
+        <!-- ============ HOME / DASHBOARD ============ -->
+        <section id="screen-home" class="space-y-4">
+
+          <!-- SpO2 + HR -->
+          <div class="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+            <div class="flex items-center justify-between gap-4">
+              <div class="flex-1">
+                <div class="text-xs text-slate-400">SpO₂ / HR — SIMULATED</div>
+                <div class="mt-2 text-4xl font-black"><span id="spo2">--</span><span class="text-base font-medium text-slate-400">%</span></div>
+                <div class="mt-1 text-sm text-slate-300">HR: <span id="hr">--</span> bpm</div>
+                <div class="mt-3 h-2 rounded-full bg-slate-800"><div id="spo2Bar" class="h-2 rounded-full bg-emerald-400" style="width:0%"></div></div>
+                <div class="mt-2 text-[10px] text-slate-500">Optional monitoring only. Not primary control.</div>
+              </div>
+              <div class="relative h-24 w-24">
+                <svg viewBox="0 0 120 120" class="h-full w-full">
+                  <circle cx="60" cy="60" r="52" fill="none" stroke="#1e293b" stroke-width="10"></circle>
+                  <circle id="spo2Ring" cx="60" cy="60" r="52" fill="none" stroke="#34d399" stroke-width="10" stroke-linecap="round" stroke-dasharray="326.7" stroke-dashoffset="326.7" transform="rotate(-90 60 60)"></circle>
+                </svg>
+                <div class="absolute inset-0 grid place-items-center text-xs font-semibold text-emerald-300">SpO₂</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mode / FiO2 / I:E row -->
+          <div class="grid grid-cols-3 gap-3">
+            <div class="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+              <div class="text-[10px] text-slate-400">Mode</div>
+              <div class="mt-1 text-xl font-black text-sky-300" id="modeNameCard">CMV</div>
+            </div>
+            <div class="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+              <div class="text-[10px] text-slate-400">FiO₂</div>
+              <div class="mt-1 text-xl font-black"><span id="fio2">40</span><span class="text-xs text-slate-400">%</span></div>
+            </div>
+            <div class="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+              <div class="text-[10px] text-slate-400">I:E Ratio</div>
+              <div class="mt-1 text-xl font-black" id="ieRatio">1:2.0</div>
+            </div>
+          </div>
+
+          <!-- BPM + Minute Volume -->
+          <div class="grid grid-cols-2 gap-3">
+            <div class="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+              <div class="text-xs text-slate-400">Delivered BPM</div>
+              <div class="mt-2 text-3xl font-black" id="deliveredBpm">--</div>
+              <div class="mt-1 text-[10px] text-slate-500">Total RR: <span id="respRate">--</span></div>
+            </div>
+            <div class="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+              <div class="text-xs text-slate-400">Minute Volume</div>
+              <div class="mt-2 text-3xl font-black"><span id="minuteVolume">--</span><span class="text-sm text-slate-400"> L/min</span></div>
+              <div class="mt-1 text-[10px] text-slate-500">MV = TV × RR</div>
+            </div>
+          </div>
+
+          <!-- Tidal Volume + Plateau -->
+          <div class="grid grid-cols-2 gap-3">
+            <div class="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+              <div class="text-xs text-slate-400">Tidal Volume</div>
+              <div class="mt-2 text-3xl font-black"><span id="tidalVolume">--</span><span class="text-sm text-slate-400"> mL</span></div>
+            </div>
+            <div class="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+              <div class="text-xs text-slate-400">Plateau P</div>
+              <div class="mt-2 text-3xl font-black"><span id="plateau">--</span><span class="text-sm text-slate-400"> cmH₂O</span></div>
+            </div>
+          </div>
+
+          <!-- Airway Pressure + waveform -->
+          <div class="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <div class="text-xs text-slate-400">Airway Pressure</div>
+                <div class="mt-1 text-3xl font-black"><span id="currentPressure">--</span><span class="text-sm text-slate-400"> cmH₂O</span></div>
+              </div>
+              <div class="text-right">
+                <div class="text-xs text-slate-400">PIP</div>
+                <div class="mt-1 text-lg font-bold" id="pip">--</div>
+              </div>
+              <div class="text-right">
+                <div class="text-xs text-slate-400">PEEP</div>
+                <div class="mt-1 text-lg font-bold" id="peep">--</div>
+              </div>
+              <div class="text-right">
+                <div class="text-xs text-slate-400">MV</div>
+                <div class="mt-1 text-lg font-bold"><span id="mvShort">--</span></div>
+              </div>
+              <div class="text-right">
+                <div class="text-xs text-slate-400">Trach</div>
+                <div class="mt-1 text-lg font-bold"><span id="trach">--</span></div>
+              </div>
+            </div>
+            <canvas id="pressureWave" class="mt-3 h-28 w-full rounded-2xl bg-slate-950/60"></canvas>
+            <div class="mt-2 flex items-center justify-between text-[10px] text-slate-500">
+              <span>🟢 Inspiration · 🟡 Plateau · 🔴 Expiration · 🟡 Patient trigger</span>
+            </div>
+          </div>
+
+          <!-- Flow + Volume waveforms -->
+          <div class="grid grid-cols-2 gap-3">
+            <div class="rounded-3xl border border-slate-800 bg-slate-900 p-3">
+              <div class="text-[10px] text-slate-400">Flow (L/min)</div>
+              <canvas id="flowWave" class="mt-2 h-20 w-full rounded-2xl bg-slate-950/60"></canvas>
+            </div>
+            <div class="rounded-3xl border border-slate-800 bg-slate-900 p-3">
+              <div class="text-[10px] text-slate-400">Volume (mL)</div>
+              <canvas id="volumeWave" class="mt-2 h-20 w-full rounded-2xl bg-slate-950/60"></canvas>
+            </div>
+          </div>
+
+          <!-- PV + FV Loops -->
+          <div class="grid grid-cols-2 gap-3" id="loopsBlock">
+            <div class="rounded-3xl border border-slate-800 bg-slate-900 p-3" id="pvCard">
+              <div class="flex items-center justify-between">
+                <div class="text-[10px] text-slate-400">PV Loop</div>
+                <div class="text-[9px] text-slate-500">Compliance</div>
+              </div>
+              <canvas id="pvLoop" class="mt-2 h-32 w-full rounded-2xl bg-slate-950/60"></canvas>
+            </div>
+            <div class="rounded-3xl border border-slate-800 bg-slate-900 p-3" id="fvCard">
+              <div class="flex items-center justify-between">
+                <div class="text-[10px] text-slate-400">FV Loop</div>
+                <div class="text-[9px] text-slate-500">Resistance</div>
+              </div>
+              <canvas id="fvLoop" class="mt-2 h-32 w-full rounded-2xl bg-slate-950/60"></canvas>
+            </div>
+          </div>
+
+          <!-- Cycle count + Apnea backup status -->
+          <div class="grid grid-cols-2 gap-3">
+            <div class="rounded-3xl border border-slate-800 bg-slate-900 p-4" id="cycleCard">
+              <div class="text-[10px] text-slate-400">Cycle Count</div>
+              <div class="mt-1 text-2xl font-black" id="cycleCount">0</div>
+              <div class="mt-1 text-[10px] text-slate-500">Total breaths delivered</div>
+            </div>
+            <div class="rounded-3xl border border-slate-800 bg-slate-900 p-4" id="apneaCard">
+              <div class="text-[10px] text-slate-400">Apnea Backup</div>
+              <div class="mt-1 text-lg font-bold text-emerald-300" id="apneaBackupStatus">ON · 15s</div>
+              <div class="mt-1 text-[10px] text-slate-500">Auto-ventilate if no trigger</div>
+            </div>
+          </div>
+
+          <!-- Clinical Actions — PIN protected -->
+          <div class="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+            <div class="flex items-center justify-between">
+              <div class="text-xs text-slate-400">Clinical Actions — PIN required</div>
+              <div class="text-[10px] text-amber-300">Clinician only</div>
+            </div>
+            <div class="mt-3 grid grid-cols-2 gap-2">
+              <button id="inspHoldBtn" class="rounded-2xl border border-amber-700/40 bg-amber-500/10 px-3 py-3 text-xs font-bold text-amber-200 active:scale-[0.97]">
+                ⏸ Hold Insp.
+              </button>
+              <button id="manualBreathBtn" class="rounded-2xl border border-sky-700/40 bg-sky-500/10 px-3 py-3 text-xs font-bold text-sky-200 active:scale-[0.97]">
+                💨 Manual Breath
+              </button>
+              <button id="preOxyBtn" class="col-span-2 rounded-2xl border border-slate-700 bg-slate-950 px-3 py-3 text-xs font-bold text-slate-200 active:scale-[0.97]">
+                🩺 Pre-oxygenate (100% O₂ × 2 min)
+              </button>
+            </div>
+            <div class="mt-2 text-[10px] text-slate-500">Demo only. Real device: hardware interlocks required.</div>
+          </div>
+
+          <!-- Battery + Runtime -->
+          <div class="grid grid-cols-2 gap-3">
+            <div class="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+              <div class="text-xs text-slate-400">Battery</div>
+              <div class="mt-2 text-2xl font-black" id="batteryVoltage">-- V</div>
+              <div class="mt-1 text-xs text-slate-400">Current: <span id="batteryCurrent">-- mA</span></div>
+              <div class="mt-2 h-1.5 rounded-full bg-slate-800"><div id="batteryBar" class="h-1.5 rounded-full bg-emerald-400" style="width:0%"></div></div>
+            </div>
+            <div class="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+              <div class="text-xs text-slate-400">Est. Runtime</div>
+              <div class="mt-2 text-2xl font-black" id="remainingHours">-- h</div>
+              <div class="mt-1 text-[10px] text-slate-500">Demo estimate only.</div>
+            </div>
+          </div>
+
+          <!-- Power / Motor -->
+          <div class="grid grid-cols-2 gap-3">
+            <div class="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+              <div class="text-xs text-slate-400">Power Source</div>
+              <div class="mt-2 text-lg font-bold" id="powerSource">--</div>
+            </div>
+            <div class="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+              <div class="text-xs text-slate-400">Motor Temp</div>
+              <div class="mt-2 text-lg font-bold"><span id="motorTemp">--</span>°C</div>
+            </div>
+          </div>
+
+          <!-- E-stop -->
+          <div class="rounded-3xl border border-red-900/60 bg-red-950/20 p-4">
+            <div class="text-xs font-semibold text-red-300">EMERGENCY STOP — DEMO REQUEST</div>
+            <button id="estopBtn" class="mt-3 w-full select-none rounded-2xl bg-red-600 px-4 py-4 text-sm font-black tracking-wide text-white transition active:scale-[0.98]">
+              <span id="estopText">HOLD 1.5s TO REQUEST STOP</span>
+            </button>
+            <div class="mt-2 text-[10px] leading-relaxed text-red-200/70">
+              UI request only. Real device me hardware safety supervisor zaroori hai.
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ TRENDS ============ -->
+        <section id="screen-trends" class="hidden space-y-3">
+          <div class="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+            <div class="flex items-center justify-between">
+              <div class="text-sm font-semibold">Last 5 min trends</div>
+              <div class="text-[10px] text-slate-500">Updated 1 Hz</div>
+            </div>
+            <canvas id="trendChart" class="mt-3 h-56 w-full"></canvas>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+              <div class="text-[10px] text-slate-400">PIP avg (5m)</div>
+              <div class="mt-1 text-xl font-bold" id="pipAvg">--</div>
+            </div>
+            <div class="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+              <div class="text-[10px] text-slate-400">PEEP avg (5m)</div>
+              <div class="mt-1 text-xl font-bold" id="peepAvg">--</div>
+            </div>
+            <div class="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+              <div class="text-[10px] text-slate-400">TV avg (5m)</div>
+              <div class="mt-1 text-xl font-bold" id="tvAvg">--</div>
+            </div>
+            <div class="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+              <div class="text-[10px] text-slate-400">MV avg (5m)</div>
+              <div class="mt-1 text-xl font-bold" id="mvAvg">--</div>
+            </div>
+          </div>
+          <button id="exportTrendBtn" class="w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm font-semibold">Export trend as CSV</button>
+        </section>
+
+        <!-- ============ PATIENT ============ -->
+        <section id="screen-patient" class="hidden space-y-3">
+          <div class="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+            <div class="text-xs text-slate-400">Patient Profile</div>
+            <div class="mt-3 grid grid-cols-2 gap-3 text-sm">
+              <label class="block">
+                <div class="text-[10px] text-slate-500">Name</div>
+                <input id="ptName" type="text" class="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm" />
+              </label>
+              <label class="block">
+                <div class="text-[10px] text-slate-500">Patient ID</div>
+                <input id="ptId" type="text" class="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm" />
+              </label>
+              <label class="block">
+                <div class="text-[10px] text-slate-500">Age</div>
+                <input id="ptAge" type="number" min="0" max="120" class="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm" />
+              </label>
+              <label class="block">
+                <div class="text-[10px] text-slate-500">Gender</div>
+                <select id="ptGender" class="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm">
+                  <option value="M">Male</option>
+                  <option value="F">Female</option>
+                  <option value="O">Other</option>
+                </select>
+              </label>
+              <label class="block">
+                <div class="text-[10px] text-slate-500">Height (cm)</div>
+                <input id="ptHeight" type="number" min="30" max="230" class="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm" />
+              </label>
+              <label class="block">
+                <div class="text-[10px] text-slate-500">Weight (kg)</div>
+                <input id="ptWeight" type="number" min="1" max="300" class="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm" />
+              </label>
+            </div>
+            <button id="savePatientBtn" class="mt-3 w-full rounded-2xl border border-slate-700 bg-sky-500/10 px-4 py-3 text-sm font-semibold text-sky-300">Save Patient</button>
+          </div>
+
+          <div class="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+            <div class="text-xs text-slate-400">Calculated Targets (ARDS-net lite)</div>
+            <div class="mt-3 grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <div class="text-[10px] text-slate-500">IBW</div>
+                <div class="font-semibold"><span id="ibwVal">--</span> kg</div>
+              </div>
+              <div>
+                <div class="text-[10px] text-slate-500">TV target (6–8 mL/kg IBW)</div>
+                <div class="font-semibold"><span id="tvTargetLow">--</span>–<span id="tvTargetHigh">--</span> mL</div>
+              </div>
+            </div>
+            <div class="mt-2 text-[10px] text-slate-500">Demo calculation only. Clinically validated protocol required.</div>
+          </div>
+        </section>
+
+        <!-- ============ ALERTS ============ -->
+        <section id="screen-alerts" class="hidden space-y-3">
+          <div class="text-sm text-slate-400">Active + recent alerts. Local alarm primary; UI/notification secondary.</div>
+          <div class="flex gap-2">
+            <button id="ackAllBtn" class="flex-1 rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm font-semibold">Acknowledge All</button>
+            <button id="clearAlertsBtn" class="flex-1 rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm font-semibold">Clear All</button>
+          </div>
+          <div id="alertsList" class="space-y-3"></div>
+        </section>
+
+        <!-- ============ MORE (Logs / Device / Settings) ============ -->
+        <section id="screen-more" class="hidden space-y-3">
+
+          <!-- LOGS -->
+          <div class="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+            <div class="flex items-center justify-between">
+              <div class="text-sm font-semibold">Session Logs</div>
+              <div class="text-[10px] text-slate-500" id="logCount">0 entries</div>
+            </div>
+            <div class="mt-3 grid grid-cols-3 gap-2 text-xs">
+              <button id="exportJsonBtn" class="rounded-xl border border-slate-700 bg-slate-950 px-2 py-2 font-semibold">JSON</button>
+              <button id="exportCsvBtn" class="rounded-xl border border-slate-700 bg-slate-950 px-2 py-2 font-semibold">CSV</button>
+              <button id="exportPdfBtn" class="rounded-xl border border-slate-700 bg-slate-950 px-2 py-2 font-semibold">PDF</button>
+              <button id="exportFhirBtn" class="rounded-xl border border-slate-700 bg-slate-950 px-2 py-2 font-semibold col-span-2">FHIR Bundle</button>
+              <button id="clearLogsBtn" class="rounded-xl border border-slate-700 bg-slate-950 px-2 py-2 font-semibold">Clear</button>
+            </div>
+            <div id="logsList" class="mt-3 space-y-2"></div>
+          </div>
+
+          <!-- DEVICE -->
+          <div class="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+            <div class="text-xs text-slate-400">Device Information</div>
+            <div class="mt-3 grid grid-cols-2 gap-3 text-sm">
+              <div><div class="text-xs text-slate-500">Device ID</div><div class="font-semibold" id="deviceInfoId">--</div></div>
+              <div><div class="text-xs text-slate-500">Serial</div><div class="font-semibold" id="deviceInfoSerial">--</div></div>
+              <div><div class="text-xs text-slate-500">Hardware</div><div class="font-semibold" id="deviceInfoHardware">--</div></div>
+              <div><div class="text-xs text-slate-500">Firmware</div><div class="font-semibold" id="deviceInfoFirmware">--</div></div>
+              <div><div class="text-xs text-slate-500">Hours of operation</div><div class="font-semibold" id="deviceHours">--</div></div>
+              <div><div class="text-xs text-slate-500">Filter status</div><div class="font-semibold" id="deviceFilter">--</div></div>
+            </div>
+            <button id="otaBtn" class="mt-3 w-full rounded-2xl border border-sky-700/40 bg-sky-500/10 px-4 py-3 text-sm font-semibold text-sky-300">Check for firmware updates</button>
+          </div>
+
+          <!-- QR ONBOARDING -->
+          <div class="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+            <div class="text-xs text-slate-400">QR Onboarding</div>
+            <div class="mt-3 grid grid-cols-2 gap-3">
+              <div class="rounded-2xl border border-slate-800 bg-slate-950 p-3">
+                <div class="mx-auto grid h-24 w-24 place-items-center rounded-xl bg-white text-xs font-bold text-slate-900">QR 1</div>
+                <div class="mt-2 text-center text-xs text-slate-300">App Download</div>
+              </div>
+              <div class="rounded-2xl border border-slate-800 bg-slate-950 p-3">
+                <div class="mx-auto grid h-24 w-24 place-items-center rounded-xl bg-white text-xs font-bold text-slate-900">QR 2</div>
+                <div class="mt-2 text-center text-xs text-slate-300">Secure Pairing</div>
+              </div>
+            </div>
+            <div class="mt-3 text-[10px] text-slate-500">Wi-Fi password public QR me expose mat karo. Secure token/BLE use karo.</div>
+          </div>
+
+          <!-- SETTINGS -->
+          <div class="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+            <div class="text-xs text-slate-400">Settings</div>
+
+            <div class="mt-3 space-y-3 text-sm">
+              <div class="flex items-center justify-between">
+                <span>Dark theme</span>
+                <button id="themeToggle" class="rounded-full border border-slate-700 bg-slate-950 px-3 py-1 text-xs font-semibold">Off</button>
+              </div>
+              <div class="flex items-center justify-between">
+                <span>Audio alarms</span>
+                <button id="audioToggle" class="rounded-full border border-slate-700 bg-slate-950 px-3 py-1 text-xs font-semibold">On</button>
+              </div>
+              <div>
+                <div class="text-xs text-slate-500">High Pressure limit (cmH₂O)</div>
+                <input id="setHiPress" type="range" min="20" max="50" value="35" class="w-full" />
+                <div class="text-right text-xs"><span id="setHiPressVal">35</span></div>
+              </div>
+              <div>
+                <div class="text-xs text-slate-500">Low PIP limit (cmH₂O)</div>
+                <input id="setLoPip" type="range" min="5" max="25" value="10" class="w-full" />
+                <div class="text-right text-xs"><span id="setLoPipVal">10</span></div>
+              </div>
+              <div>
+                <div class="text-xs text-slate-500">Low MV limit (L/min)</div>
+                <input id="setLoMv" type="range" min="0.5" max="5" step="0.1" value="2" class="w-full" />
+                <div class="text-right text-xs"><span id="setLoMvVal">2.0</span></div>
+              </div>
+              <div>
+                <div class="text-xs text-slate-500">Low SpO₂ threshold (%)</div>
+                <input id="setLowSpo2" type="range" min="80" max="95" value="90" class="w-full" />
+                <div class="text-right text-xs"><span id="setLowSpo2Val">90</span></div>
+              </div>
+              <div>
+                <div class="text-xs text-slate-500">Low Battery (%)</div>
+                <input id="setLowBatt" type="range" min="5" max="50" value="20" class="w-full" />
+                <div class="text-right text-xs"><span id="setLowBattVal">20</span></div>
+              </div>
+              <div class="mt-2 border-t border-slate-800 pt-3">
+                <div class="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Mode-specific</div>
+                <div class="mt-2 space-y-3">
+                  <div>
+                    <div class="text-xs text-slate-500">Exp. Sensitivity (% peak flow)</div>
+                    <input id="setExpSens" type="range" min="10" max="80" value="25" class="w-full" />
+                    <div class="text-right text-xs"><span id="setExpSensVal">25</span>%</div>
+                  </div>
+                  <div>
+                    <div class="text-xs text-slate-500">Rise Time (ms)</div>
+                    <input id="setRiseTime" type="range" min="0" max="200" step="5" value="50" class="w-full" />
+                    <div class="text-right text-xs"><span id="setRiseTimeVal">50</span> ms</div>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <span>Apnea backup</span>
+                    <button id="apneaBackupToggle" class="rounded-full border border-slate-700 bg-slate-950 px-3 py-1 text-xs font-semibold">On</button>
+                  </div>
+                </div>
+              </div>
+              <div class="mt-3 border-t border-slate-800 pt-3">
+                <div class="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Display options</div>
+                <div class="mt-2 space-y-2 text-xs">
+                  <label class="flex items-center gap-2"><input type="checkbox" id="optShowPv" checked /> PV Loop</label>
+                  <label class="flex items-center gap-2"><input type="checkbox" id="optShowFv" checked /> FV Loop</label>
+                  <label class="flex items-center gap-2"><input type="checkbox" id="optShowTrach" checked /> Tracheal pressure</label>
+                  <label class="flex items-center gap-2"><input type="checkbox" id="optShowCycle" checked /> Cycle count + Apnea card</label>
+                </div>
+              </div>
+              <div class="flex items-center justify-between">
+                <span>Change PIN</span>
+                <button id="changePinBtn" class="rounded-full border border-slate-700 bg-slate-950 px-3 py-1 text-xs font-semibold">Set</button>
+              </div>
+              <div class="flex items-center justify-between">
+                <span>Reset demo</span>
+                <button id="resetDemoBtn" class="rounded-full border border-slate-700 bg-slate-950 px-3 py-1 text-xs font-semibold">Run</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="text-center text-[10px] text-slate-500 pt-2">v0.3.0-demo · Not for clinical use</div>
+        </section>
+      </main>
+
+      <!-- BOTTOM NAV -->
+      <nav class="fixed inset-x-0 bottom-0 z-50 border-t border-slate-800 bg-slate-950/95 backdrop-blur">
+        <div class="mx-auto grid max-w-md grid-cols-5 px-1 py-1 text-[11px]">
+          <button data-screen="home" class="nav-btn rounded-2xl px-1 py-2 font-semibold">
+            <div>🏠</div><div>Home</div>
+          </button>
+          <button data-screen="trends" class="nav-btn rounded-2xl px-1 py-2 font-semibold">
+            <div>📈</div><div>Trends</div>
+          </button>
+          <button data-screen="patient" class="nav-btn rounded-2xl px-1 py-2 font-semibold">
+            <div>🧍</div><div>Patient</div>
+          </button>
+          <button data-screen="alerts" class="nav-btn rounded-2xl px-1 py-2 font-semibold">
+            <div>🔔</div><div>Alerts</div>
+          </button>
+          <button data-screen="more" class="nav-btn rounded-2xl px-1 py-2 font-semibold">
+            <div>⋯</div><div>More</div>
+          </button>
+        </div>
+      </nav>
+    </div>
+  </div>
+
+  <!-- ==================== MODALS ==================== -->
+
+  <!-- Mode Selector -->
+  <div id="modal-mode" class="fixed inset-0 z-[60] hidden place-items-center modal-back px-4">
+    <div class="w-full max-w-sm rounded-3xl border border-slate-800 bg-slate-900 p-5">
+      <div class="text-sm font-bold">Select Ventilation Mode</div>
+      <div class="mt-1 text-[10px] text-amber-300">Mode change requires PIN confirmation in real device.</div>
+      <div class="mt-3 grid grid-cols-2 gap-2 text-sm">
+        <button data-mode="CMV" class="mode-opt rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-left">
+          <div class="font-semibold">CMV</div><div class="text-[10px] text-slate-400">Controlled</div>
+        </button>
+        <button data-mode="SIMV" class="mode-opt rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-left">
+          <div class="font-semibold">SIMV</div><div class="text-[10px] text-slate-400">Synchronized Intermittent</div>
+        </button>
+        <button data-mode="PSV" class="mode-opt rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-left">
+          <div class="font-semibold">PSV</div><div class="text-[10px] text-slate-400">Pressure Support</div>
+        </button>
+        <button data-mode="CPAP" class="mode-opt rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-left">
+          <div class="font-semibold">CPAP</div><div class="text-[10px] text-slate-400">Spontaneous</div>
+        </button>
+        <button data-mode="BiPAP" class="mode-opt rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-left col-span-2">
+          <div class="font-semibold">BiPAP</div><div class="text-[10px] text-slate-400">Two-level positive airway</div>
+        </button>
+      </div>
+      <button class="modal-close mt-4 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Scenario Picker -->
+  <div id="modal-scenario" class="fixed inset-0 z-[60] hidden place-items-center modal-back px-4">
+    <div class="w-full max-w-sm rounded-3xl border border-slate-800 bg-slate-900 p-5">
+      <div class="text-sm font-bold">Demo Scenario</div>
+      <div class="mt-1 text-[10px] text-slate-400">Simulates clinical preset for demo/learning only.</div>
+      <div class="mt-3 space-y-2 text-sm">
+        <button data-scenario="normal" class="scn-opt w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-left">
+          <div class="font-semibold text-emerald-300">Normal Adult</div>
+          <div class="text-[10px] text-slate-400">SpO₂ 97, HR 74, PIP 22, PEEP 5, TV 450</div>
+        </button>
+        <button data-scenario="ards" class="scn-opt w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-left">
+          <div class="font-semibold text-amber-300">ARDS</div>
+          <div class="text-[10px] text-slate-400">SpO₂ 92, HR 95, PIP 32, PEEP 12, TV 350 (low Vt)</div>
+        </button>
+        <button data-scenario="copd" class="scn-opt w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-left">
+          <div class="font-semibold text-sky-300">COPD</div>
+          <div class="text-[10px] text-slate-400">SpO₂ 94, HR 88, PIP 26, PEEP 6, TV 500</div>
+        </button>
+        <button data-scenario="pediatric" class="scn-opt w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-left">
+          <div class="font-semibold text-pink-300">Pediatric</div>
+          <div class="text-[10px] text-slate-400">SpO₂ 98, HR 110, RR 24, TV 120, PEEP 4</div>
+        </button>
+      </div>
+      <button class="modal-close mt-4 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm">Cancel</button>
+    </div>
+  </div>
+
+  <!-- E-stop confirm -->
+  <div id="modal-estop" class="fixed inset-0 z-[60] hidden place-items-center modal-back px-4">
+    <div class="w-full max-w-sm rounded-3xl border border-red-500/40 bg-red-950/30 p-5 text-center">
+      <div class="text-2xl">⚠️</div>
+      <div class="mt-1 text-base font-bold text-red-200">Confirm Emergency Stop?</div>
+      <div class="mt-1 text-xs text-red-200/80">Ventilation will pause. Hardware supervisor zaroori hai real device me.</div>
+      <div class="mt-4 flex gap-2">
+        <button id="estopCancel" class="flex-1 rounded-xl border border-slate-700 bg-slate-900 px-3 py-3 text-sm font-semibold">Cancel</button>
+        <button id="estopConfirm" class="flex-1 rounded-xl border border-red-400/40 bg-red-600 px-3 py-3 text-sm font-bold">STOP NOW</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- OTA modal -->
+  <div id="modal-ota" class="fixed inset-0 z-[60] hidden place-items-center modal-back px-4">
+    <div class="w-full max-w-sm rounded-3xl border border-slate-800 bg-slate-900 p-5">
+      <div class="text-sm font-bold">Firmware Update</div>
+      <div id="otaStatus" class="mt-2 text-xs text-slate-300">Checking…</div>
+      <div class="mt-3 h-2 rounded-full bg-slate-800"><div id="otaBar" class="h-2 rounded-full bg-sky-400" style="width:0%"></div></div>
+      <div id="otaDetail" class="mt-3 text-[10px] text-slate-500"></div>
+      <button class="modal-close mt-4 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm">Close</button>
+    </div>
+  </div>
+
+  <!-- PIN for actions -->
+  <div id="modal-pin" class="fixed inset-0 z-[70] hidden place-items-center modal-back px-4">
+    <div class="w-full max-w-xs rounded-3xl border border-slate-800 bg-slate-900 p-5">
+      <div class="text-sm font-bold text-center" id="pinPromptTitle">Enter PIN</div>
+      <div class="mt-1 text-[10px] text-center text-slate-400" id="pinPromptSub">Confirm action</div>
+      <div id="pinPromptDots" class="mt-4 flex justify-center gap-3">
+        <div class="pinp-dot h-3 w-3 rounded-full border border-slate-600"></div>
+        <div class="pinp-dot h-3 w-3 rounded-full border border-slate-600"></div>
+        <div class="pinp-dot h-3 w-3 rounded-full border border-slate-600"></div>
+        <div class="pinp-dot h-3 w-3 rounded-full border border-slate-600"></div>
+      </div>
+      <div id="pinPromptError" class="mt-2 hidden text-center text-xs text-red-300">Wrong PIN</div>
+      <div class="mt-4 grid grid-cols-3 gap-2 text-sm">
+        <button class="pinp-key grid h-12 place-items-center rounded-xl border border-slate-700 bg-slate-800 text-base font-bold" data-k="1">1</button>
+        <button class="pinp-key grid h-12 place-items-center rounded-xl border border-slate-700 bg-slate-800 text-base font-bold" data-k="2">2</button>
+        <button class="pinp-key grid h-12 place-items-center rounded-xl border border-slate-700 bg-slate-800 text-base font-bold" data-k="3">3</button>
+        <button class="pinp-key grid h-12 place-items-center rounded-xl border border-slate-700 bg-slate-800 text-base font-bold" data-k="4">4</button>
+        <button class="pinp-key grid h-12 place-items-center rounded-xl border border-slate-700 bg-slate-800 text-base font-bold" data-k="5">5</button>
+        <button class="pinp-key grid h-12 place-items-center rounded-xl border border-slate-700 bg-slate-800 text-base font-bold" data-k="6">6</button>
+        <button class="pinp-key grid h-12 place-items-center rounded-xl border border-slate-700 bg-slate-800 text-base font-bold" data-k="7">7</button>
+        <button class="pinp-key grid h-12 place-items-center rounded-xl border border-slate-700 bg-slate-800 text-base font-bold" data-k="8">8</button>
+        <button class="pinp-key grid h-12 place-items-center rounded-xl border border-slate-700 bg-slate-800 text-base font-bold" data-k="9">9</button>
+        <button class="pinp-key grid h-12 place-items-center rounded-xl border border-slate-700 bg-slate-800 text-sm font-semibold" data-k="clear">CLR</button>
+        <button class="pinp-key grid h-12 place-items-center rounded-xl border border-slate-700 bg-slate-800 text-base font-bold" data-k="0">0</button>
+        <button class="pinp-key grid h-12 place-items-center rounded-xl border border-slate-700 bg-slate-800 text-sm font-semibold" data-k="del">DEL</button>
+      </div>
+      <button class="modal-close mt-3 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="fixed bottom-24 left-1/2 z-[80] hidden -translate-x-1/2 rounded-full border border-sky-400/40 bg-sky-500/20 px-4 py-2 text-xs font-semibold text-sky-200"></div>
+
+  <!-- ==================== APP LOGIC ==================== -->
+  <script>
+  // ===========================================================
+  // STATE & STORAGE
+  // ===========================================================
+  const STORAGE_KEY = "vent_demo_state_v2";
+
+  const defaultState = {
+    pin: "1234",
+    operatorId: "OP-" + Math.random().toString(36).slice(2, 6).toUpperCase(),
+    device: {
+      id: "VENT-STM32-01",
+      serial: "SN-0001",
+      hardware: "REV-A",
+      firmware: "0.2.0-demo",
+      hoursOfOp: 1247,
+      filterHours: 312
+    },
+    sessionId: "SES-" + Math.random().toString(36).slice(2, 8).toUpperCase(),
+    connection: { ble: "CONNECTED", wifi: "OFFLINE" },
+    paused: false,
+    mode: "CMV",
+    scenario: "normal",
+    fio2: 40,
+    settings: {
+      audioOn: true,
+      darkTheme: true,
+      hiPressure: 35,
+      loPressure: 10,
+      loMv: 2.0,
+      lowSpo2: 90,
+      lowBatt: 20,
+      expSens: 25,
+      riseTime: 50,
+      apneaBackup: true
+    },
+    display: {
+      showPv: true,
+      showFv: true,
+      showTrach: true,
+      showCycle: true
+    },
+    vitals: {
+      spo2: 97, hr: 74, respRate: 16, deliveredBpm: 16, tidalVolume: 450,
+      pip: 22.4, peep: 5.1, plateau: 21.0, ie: "1:2.0",
+      currentPressure: 12.5, currentFlow: 0, currentVolume: 0,
+      trachPressure: 14.0, cycleCount: 0, currentPhase: "exp"
+    },
+    electrical: {
+      source: "BATTERY", batteryPercent: 84, voltage: 15.2, current: 420,
+      remainingHours: 18.5, motorTemp: 36.5
+    },
+    patient: { name: "", id: "", age: 50, gender: "M", height: 170, weight: 70 },
+    alerts: [], logs: [], trendBuffer: []
+  };
+
+  // Load persisted (but keep fresh session id)
+  let state;
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+    if (saved && saved.device) {
+      state = saved;
+      state.sessionId = "SES-" + Math.random().toString(36).slice(2, 8).toUpperCase();
+    } else {
+      state = JSON.parse(JSON.stringify(defaultState));
+    }
+  } catch (e) {
+    state = JSON.parse(JSON.stringify(defaultState));
+  }
+
+  function persist() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+  }
+
+  // ===========================================================
+  // UTILITIES
+  // ===========================================================
+  function clamp(v, mn, mx) { return Math.max(mn, Math.min(mx, v)); }
+  function walk(v, mn, mx, s) { return clamp(v + (Math.random() - 0.5) * s, mn, mx); }
+  function fmt(n, d=1) { return Number(n).toFixed(d); }
+  function toast(msg) {
+    const t = document.getElementById("toast");
+    t.textContent = msg; t.classList.remove("hidden");
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => t.classList.add("hidden"), 2200);
+  }
+
+  // ===========================================================
+  // SCENARIOS
+  // ===========================================================
+  const SCENARIOS = {
+    normal:    { spo2:97, hr:74,  rr:16, tv:450, pip:22, peep:5,  fio2:40, name:"Normal Adult" },
+    ards:      { spo2:92, hr:95,  rr:22, tv:350, pip:32, peep:12, fio2:60, name:"ARDS" },
+    copd:      { spo2:94, hr:88,  rr:18, tv:500, pip:26, peep:6,  fio2:35, name:"COPD" },
+    pediatric: { spo2:98, hr:110, rr:24, tv:120, pip:18, peep:4,  fio2:30, name:"Pediatric" }
+  };
+
+  function applyScenario(key) {
+    const s = SCENARIOS[key];
+    if (!s) return;
+    state.scenario = key;
+    state.vitals.spo2 = s.spo2; state.vitals.hr = s.hr; state.vitals.respRate = s.rr;
+    state.vitals.deliveredBpm = s.rr; state.vitals.tidalVolume = s.tv;
+    state.vitals.pip = s.pip; state.vitals.peep = s.peep; state.vitals.plateau = s.pip - 1.4;
+    state.fio2 = s.fio2;
+    document.getElementById("scenarioName").textContent = s.name;
+    addAlert("SCENARIO", `Demo scenario: ${s.name}.`, "info");
+    render();
+  }
+
+  // ===========================================================
+  // BREATH CYCLE (proper inspiration / plateau / expiration)
+  // ===========================================================
+  const breath = { t: 0, cycleStart: 0, phase: "exp", inspEnd: 0, expStart: 0 };
+
+  function breathCycleUpdate() {
+    if (state.paused) return { pressure: 0, flow: 0, volume: 0, phase: "paused" };
+    const cycleSec = 60 / Math.max(8, state.vitals.deliveredBpm);
+    breath.t += 1 / 60; // approx 60 fps
+    const tt = breath.t % cycleSec;
+    const inspFrac = 0.40, platFrac = 0.10;
+    const inspT = cycleSec * inspFrac;
+    const platT = cycleSec * platFrac;
+    const pip = state.vitals.pip, peep = state.vitals.peep, tv = state.vitals.tidalVolume;
+
+    let pressure, flow, volume, phase;
+    if (tt < inspT) {
+      // Inspiration: ease up to PIP
+      const f = tt / inspT;
+      pressure = peep + (pip - peep) * (1 - Math.cos(f * Math.PI)) / 2;
+      flow = (tv / 1000) * (Math.sin(f * Math.PI) * 60 / inspT); // L/min
+      volume = (tv) * f;
+      phase = "insp";
+    } else if (tt < inspT + platT) {
+      // Plateau
+      pressure = pip - 0.2;
+      flow = 0;
+      volume = tv;
+      phase = "plat";
+    } else {
+      // Expiration: passive decay to PEEP
+      const f = (tt - inspT - platT) / (cycleSec - inspT - platT);
+      pressure = pip - (pip - peep) * (1 - Math.exp(-3 * f));
+      flow = -((tv / 1000) * 60 / (cycleSec - inspT - platT)) * Math.exp(-3 * f);
+      volume = tv * Math.exp(-3 * f);
+      phase = "exp";
+    }
+    return { pressure, flow, volume, phase };
+  }
+
+  // ===========================================================
+  // ALERTS
+  // ===========================================================
+  function addAlert(code, message, level = "info") {
+    const existing = state.alerts.find(a => a.code === code && a.active);
+    if (existing) return;
+    const item = { code, message, level, time: new Date().toLocaleTimeString(), active: true };
+    state.alerts.unshift(item);
+    if (level !== "info") {
+      setTimeout(() => { item.active = false; renderAlerts(); updateAlarmBanner(); audioStop(); }, 8000);
+    }
+    renderAlerts(); updateAlarmBanner();
+    if (level === "critical") audioStart("critical");
+    else if (level === "high") audioStart("high");
+  }
+
+  function updateAlarmBanner() {
+    const crit = state.alerts.find(a => a.active && a.level === "critical");
+    const high = state.alerts.find(a => a.active && a.level === "high");
+    const show = crit || high;
+    const el = document.getElementById("alarmBanner");
+    if (show) {
+      el.classList.remove("hidden");
+      el.classList.toggle("border-red-500/40", !!crit);
+      el.classList.toggle("bg-red-500/10", !!crit);
+      el.classList.toggle("border-amber-500/40", !crit && !!high);
+      el.classList.toggle("bg-amber-500/10", !crit && !!high);
+      document.getElementById("alarmTitle").textContent = show.code;
+      document.getElementById("alarmText").textContent = show.message;
+      document.getElementById("alarmTitle").className = crit
+        ? "text-sm font-bold text-red-300"
+        : "text-sm font-bold text-amber-300";
+    } else {
+      el.classList.add("hidden");
+    }
+  }
+
+  // ===========================================================
+  // AUDIO ALARMS (Web Audio API)
+  // ===========================================================
+  let audioCtx = null, audioOsc = null, audioGain = null, audioLevel = null;
+  function audioStart(level) {
+    if (!state.settings.audioOn) return;
+    if (audioOsc) audioStop();
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      audioGain = audioCtx.createGain();
+      audioGain.gain.value = 0.0001;
+      audioGain.connect(audioCtx.destination);
+      audioOsc = audioCtx.createOscillator();
+      audioLevel = level;
+      audioOsc.frequency.value = level === "critical" ? 880 : 660;
+      audioOsc.type = "square";
+      audioOsc.connect(audioGain);
+      audioOsc.start();
+      audioGain.gain.exponentialRampToValueAtTime(0.12, audioCtx.currentTime + 0.05);
+
+      // beep pattern
+      audioGain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.25);
+      setTimeout(() => {
+        if (audioGain && audioCtx) {
+          audioGain.gain.exponentialRampToValueAtTime(0.12, audioCtx.currentTime + 0.05);
+          audioGain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.25);
+        }
+      }, 350);
+    } catch (e) { /* no audio support */ }
+    document.getElementById("audioBadge").textContent = level === "critical" ? "🔊" : "🔉";
+  }
+  function audioStop() {
+    try { if (audioOsc) { audioOsc.stop(); audioOsc.disconnect(); } } catch(e){}
+    audioOsc = null;
+    document.getElementById("audioBadge").textContent = "🔇";
+  }
+
+  // ===========================================================
+  // SIMULATION
+  // ===========================================================
+  function simulateData() {
+    if (state.paused) {
+      state.vitals.deliveredBpm = 0;
+      state.vitals.currentPressure = walk(state.vitals.currentPressure, 0, 7, 1);
+      state.vitals.tidalVolume = 0;
+      return;
+    }
+    // Gentle drift around scenario values
+    state.vitals.spo2 = walk(state.vitals.spo2, 85, 100, 1.0);
+    state.vitals.hr = walk(state.vitals.hr, 55, 120, 2.5);
+    state.vitals.deliveredBpm = walk(state.vitals.deliveredBpm, 10, 28, 0.6);
+    state.vitals.respRate = state.vitals.deliveredBpm;
+    state.vitals.tidalVolume = walk(state.vitals.tidalVolume, 200, 600, 18);
+    state.vitals.pip = walk(state.vitals.pip, 16, 38, 1.0);
+    state.vitals.peep = walk(state.vitals.peep, 3, 14, 0.3);
+    state.vitals.plateau = state.vitals.pip - walk(0, 0.8, 1.4, 0.3);
+    state.vitals.ie = "1:" + fmt(2.0 + (Math.random() - 0.5) * 0.3, 1);
+
+    // Battery
+    state.electrical.batteryPercent = clamp(state.electrical.batteryPercent - (Math.random() < 0.05 ? 0.1 : 0.01), 5, 100);
+    state.electrical.voltage = walk(state.electrical.voltage, 14.0, 16.8, 0.15);
+    state.electrical.current = walk(state.electrical.current, 250, 800, 35);
+    state.electrical.remainingHours = clamp(state.electrical.batteryPercent / 5, 0.5, 24);
+    state.electrical.motorTemp = walk(state.electrical.motorTemp, 33, 50, 0.4);
+
+    // Tracheal pressure follows airway with slight offset
+    state.vitals.trachPressure = walk(state.vitals.trachPressure, state.vitals.peep + 1, state.vitals.pip + 2, 1.2);
+
+    // Thresholds
+    if (state.vitals.currentPressure > state.settings.hiPressure) {
+      addAlert("HIGH_PRESSURE", `Airway pressure ${fmt(state.vitals.currentPressure)} > ${state.settings.hiPressure} cmH₂O.`, "critical");
+    }
+    if (state.vitals.pip < state.settings.loPressure && state.vitals.deliveredBpm > 0) {
+      addAlert("LOW_PIP", `PIP ${fmt(state.vitals.pip)} < ${state.settings.loPressure} cmH₂O. Possible leak/disconnect.`, "high");
+    }
+    const mv = (state.vitals.tidalVolume * state.vitals.deliveredBpm) / 1000;
+    if (mv < state.settings.loMv && state.vitals.deliveredBpm > 0) {
+      addAlert("LOW_MV", `MV ${mv.toFixed(2)} L/min < ${state.settings.loMv} L/min. Hypoventilation risk.`, "high");
+    }
+    if (state.vitals.spo2 < state.settings.lowSpo2) {
+      addAlert("LOW_SPO2", `SpO₂ ${Math.round(state.vitals.spo2)}% < ${state.settings.lowSpo2}%.`, "high");
+    }
+    if (state.electrical.batteryPercent < state.settings.lowBatt) {
+      addAlert("LOW_BATTERY", `Battery ${Math.round(state.electrical.batteryPercent)}% < ${state.settings.lowBatt}%.`, "high");
+    }
+    if (state.electrical.motorTemp > 48) {
+      addAlert("MOTOR_HOT", `Motor temp ${fmt(state.electrical.motorTemp)}°C.`, "high");
+    }
+  }
+
+  // ===========================================================
+  // RENDER
+  // ===========================================================
+  const els = {};
+  function bindEls() {
+    [
+      "deviceId","sessionId","operatorId","bleBadge","wifiBadge","audioBadge","batteryPercent","batteryPercentText",
+      "alarmBanner","alarmTitle","alarmText","ackAlarmBtn",
+      "spo2","hr","spo2Bar","spo2Ring","modeName","modeNameCard","fio2","ieRatio",
+      "deliveredBpm","respRate","minuteVolume","tidalVolume","plateau",
+      "currentPressure","pip","peep","mvShort","trach","batteryVoltage","batteryCurrent","batteryBar",
+      "remainingHours","powerSource","motorTemp","estopBtn","estopText",
+      "scenarioBtn","scenarioName","modeBtn",
+      "alertsList","logsList","logCount",
+      "deviceInfoId","deviceInfoSerial","deviceInfoHardware","deviceInfoFirmware","deviceHours","deviceFilter",
+      "exportJsonBtn","exportCsvBtn","exportPdfBtn","exportFhirBtn","clearLogsBtn","ackAllBtn","clearAlertsBtn",
+      "resetDemoBtn","otaBtn","themeToggle","audioToggle","changePinBtn",
+      "setHiPress","setHiPressVal","setLoPip","setLoPipVal","setLoMv","setLoMvVal",
+      "setLowSpo2","setLowSpo2Val","setLowBatt","setLowBattVal",
+      "setExpSens","setExpSensVal","setRiseTime","setRiseTimeVal","apneaBackupToggle",
+      "optShowPv","optShowFv","optShowTrach","optShowCycle",
+      "inspHoldBtn","manualBreathBtn","preOxyBtn",
+      "cycleCount","apneaBackupStatus","pvCard","fvCard","cycleCard","apneaCard","loopsBlock",
+      "ptName","ptId","ptAge","ptGender","ptHeight","ptWeight","savePatientBtn",
+      "ibwVal","tvTargetLow","tvTargetHigh","exportTrendBtn",
+      "pipAvg","peepAvg","tvAvg","mvAvg","lockScreen","app"
+    ].forEach(id => els[id] = document.getElementById(id));
+  }
+
+  function render() {
+    els.deviceId.textContent = state.device.id;
+    els.sessionId.textContent = state.sessionId;
+    els.operatorId.textContent = state.operatorId;
+    els.bleBadge.textContent = `BLE: ${state.connection.ble}`;
+    els.wifiBadge.textContent = `Wi-Fi: ${state.connection.wifi}`;
+
+    els.batteryPercent.textContent = Math.round(state.electrical.batteryPercent);
+    els.batteryPercentText.textContent = state.electrical.source;
+
+    els.spo2.textContent = Math.round(state.vitals.spo2);
+    els.hr.textContent = Math.round(state.vitals.hr);
+    els.spo2Bar.style.width = `${clamp(state.vitals.spo2, 0, 100)}%`;
+    const off = 326.7 * (1 - clamp(state.vitals.spo2, 0, 100) / 100);
+    els.spo2Ring.style.strokeDashoffset = off;
+
+    els.modeName.textContent = state.mode;
+    els.modeNameCard.textContent = state.mode;
+    els.fio2.textContent = state.fio2;
+    els.ieRatio.textContent = state.vitals.ie;
+
+    els.deliveredBpm.textContent = Math.round(state.vitals.deliveredBpm);
+    els.respRate.textContent = Math.round(state.vitals.respRate);
+    const mv = (state.vitals.tidalVolume * state.vitals.deliveredBpm) / 1000;
+    els.minuteVolume.textContent = fmt(mv, 1);
+    els.mvShort.textContent = fmt(mv, 1);
+    els.tidalVolume.textContent = Math.round(state.vitals.tidalVolume);
+    els.plateau.textContent = fmt(state.vitals.plateau, 1);
+
+    els.currentPressure.textContent = fmt(state.vitals.currentPressure, 1);
+    els.pip.textContent = fmt(state.vitals.pip, 1);
+    els.peep.textContent = fmt(state.vitals.peep, 1);
+    els.trach.textContent = fmt(state.vitals.trachPressure, 1);
+
+    els.batteryVoltage.textContent = `${fmt(state.electrical.voltage, 1)} V`;
+    els.batteryCurrent.textContent = `${Math.round(state.electrical.current)} mA`;
+    els.batteryBar.style.width = `${state.electrical.batteryPercent}%`;
+    els.remainingHours.textContent = `${fmt(state.electrical.remainingHours, 1)} h`;
+    els.powerSource.textContent = state.electrical.source;
+    els.motorTemp.textContent = fmt(state.electrical.motorTemp, 1);
+
+    // Cycle count, apnea status
+    els.cycleCount.textContent = state.vitals.cycleCount;
+    if (state.settings.apneaBackup) {
+      els.apneaBackupStatus.textContent = "ON · 15s";
+      els.apneaBackupStatus.classList.add("text-emerald-300");
+      els.apneaBackupStatus.classList.remove("text-slate-400");
+    } else {
+      els.apneaBackupStatus.textContent = "OFF";
+      els.apneaBackupStatus.classList.add("text-red-300");
+      els.apneaBackupStatus.classList.remove("text-emerald-300");
+    }
+    document.getElementById("apneaBackupToggle").textContent = state.settings.apneaBackup ? "On" : "Off";
+
+    // Display options
+    els.pvCard.classList.toggle("hidden", !state.display.showPv);
+    els.fvCard.classList.toggle("hidden", !state.display.showFv);
+    if (els.trach) els.trach.parentElement.parentElement.classList.toggle("hidden", !state.display.showTrach);
+    els.cycleCard.classList.toggle("hidden", !state.display.showCycle);
+    els.apneaCard.classList.toggle("hidden", !state.display.showCycle);
+    if (!state.display.showPv && !state.display.showFv) {
+      els.loopsBlock.classList.add("hidden");
+    } else {
+      els.loopsBlock.classList.remove("hidden");
+    }
+    // When only one loop visible, fill the width
+    if (state.display.showPv && !state.display.showFv) {
+      els.pvCard.classList.remove("col-span-2"); // wait, this is the other grid, ignore
+    }
+
+    els.deviceInfoId.textContent = state.device.id;
+    els.deviceInfoSerial.textContent = state.device.serial;
+    els.deviceInfoHardware.textContent = state.device.hardware;
+    els.deviceInfoFirmware.textContent = state.device.firmware;
+    els.deviceHours.textContent = state.device.hoursOfOp + " h";
+    els.deviceFilter.textContent = state.device.filterHours + " h used · OK";
+
+    if (state.paused) {
+      els.estopText.textContent = "PAUSED — DEMO STATE";
+      els.estopBtn.classList.add("opacity-70");
+    } else {
+      els.estopText.textContent = "HOLD 1.5s TO REQUEST STOP";
+      els.estopBtn.classList.remove("opacity-70");
+    }
+
+    // Audio badge
+    els.audioBadge.textContent = state.settings.audioOn ? "🔊" : "🔇";
+    document.getElementById("audioToggle").textContent = state.settings.audioOn ? "On" : "Off";
+    document.getElementById("themeToggle").textContent = state.settings.darkTheme ? "On" : "Off";
+
+    // Patient fields
+    els.ptName.value = state.patient.name;
+    els.ptId.value = state.patient.id;
+    els.ptAge.value = state.patient.age;
+    els.ptGender.value = state.patient.gender;
+    els.ptHeight.value = state.patient.height;
+    els.ptWeight.value = state.patient.weight;
+
+    // IBW
+    const h = state.patient.height;
+    const ibw = state.patient.gender === "F"
+      ? 45.5 + 0.91 * (h - 152.4)
+      : 50 + 0.91 * (h - 152.4);
+    const tvLo = Math.round(ibw * 6), tvHi = Math.round(ibw * 8);
+    els.ibwVal.textContent = ibw > 0 ? fmt(ibw, 1) : "--";
+    els.tvTargetLow.textContent = ibw > 0 ? tvLo : "--";
+    els.tvTargetHigh.textContent = ibw > 0 ? tvHi : "--";
+  }
+
+  function renderAlerts() {
+    if (!state.alerts.length) {
+      els.alertsList.innerHTML = `<div class="rounded-3xl border border-slate-800 bg-slate-900 p-4 text-sm text-slate-400">No alerts.</div>`;
+      return;
+    }
+    els.alertsList.innerHTML = state.alerts.map(a => {
+      let cls = "border-slate-700 bg-slate-900 text-slate-200";
+      if (a.level === "critical") cls = "border-red-500/40 bg-red-500/10 text-red-300";
+      else if (a.level === "high") cls = "border-amber-500/40 bg-amber-500/10 text-amber-300";
+      return `<div class="rounded-3xl border ${cls.split(' ').slice(0,2).join(' ')} p-4">
+        <div class="flex items-center justify-between gap-3">
+          <div class="text-sm font-bold ${cls.split(' ').slice(2).join(' ')}">${a.code}</div>
+          <div class="text-xs text-slate-400">${a.time}</div>
+        </div>
+        <p class="mt-2 text-xs leading-relaxed text-slate-300">${a.message}</p>
+        <div class="mt-2 text-[10px] uppercase tracking-wide text-slate-500">${a.active ? "Active" : "Cleared"} · ${a.level}</div>
+      </div>`;
+    }).join("");
+  }
+
+  function renderLogs() {
+    els.logCount.textContent = state.logs.length + " entries";
+    if (!state.logs.length) {
+      els.logsList.innerHTML = `<div class="rounded-2xl border border-slate-800 bg-slate-950 p-3 text-xs text-slate-400">No logs yet.</div>`;
+      return;
+    }
+    els.logsList.innerHTML = state.logs.slice(0, 8).map(log => `
+      <div class="rounded-2xl border border-slate-800 bg-slate-950 p-3">
+        <div class="text-[10px] text-slate-400">${log.timestamp}</div>
+        <div class="mt-1 text-[10px] text-slate-300">PIP ${fmt(log.payload.vitals.pip_cmH2O)} · PEEP ${fmt(log.payload.vitals.peep_cmH2O)} · TV ${log.payload.vitals.tidal_volume_ml} · MV ${fmt((log.payload.vitals.tidal_volume_ml*log.payload.vitals.delivered_bpm)/1000,1)} L/m</div>
+      </div>
+    `).join("");
+  }
+
+  // ===========================================================
+  // NAVIGATION
+  // ===========================================================
+  const screens = ["home","trends","patient","alerts","more"];
+  function showScreen(name) {
+    screens.forEach(k => {
+      const el = document.getElementById("screen-" + k);
+      el.classList.toggle("hidden", k !== name);
+    });
+    document.querySelectorAll(".nav-btn").forEach(btn => {
+      const active = btn.dataset.screen === name;
+      btn.classList.toggle("bg-slate-800", active);
+      btn.classList.toggle("text-sky-300", active);
+      btn.classList.toggle("text-slate-400", !active);
+    });
+    if (name === "trends") setTimeout(refreshTrendAverages, 50);
+  }
+
+  // ===========================================================
+  // PAYLOAD / LOG
+  // ===========================================================
+  function buildPayload() {
+    const mv = (state.vitals.tidalVolume * state.vitals.deliveredBpm) / 1000;
+    return {
+      device_id: state.device.id,
+      session_id: state.sessionId,
+      operator_id: state.operatorId,
+      timestamp: new Date().toISOString(),
+      mode: state.mode,
+      scenario: state.scenario,
+      patient: { ...state.patient },
+      vitals: {
+        spo2_percent: Math.round(state.vitals.spo2),
+        heart_rate_bpm: Math.round(state.vitals.hr),
+        resp_rate: Math.round(state.vitals.respRate),
+        delivered_bpm: Math.round(state.vitals.deliveredBpm),
+        tidal_volume_ml: Math.round(state.vitals.tidalVolume),
+        minute_volume_lpm: Number(mv.toFixed(2)),
+        pip_cmH2O: Number(state.vitals.pip.toFixed(1)),
+        peep_cmH2O: Number(state.vitals.peep.toFixed(1)),
+        plateau_cmH2O: Number(state.vitals.plateau.toFixed(1)),
+        airway_pressure_cmH2O: Number(state.vitals.currentPressure.toFixed(1)),
+        ie_ratio: state.vitals.ie,
+        fio2_percent: state.fio2
+      },
+      electrical: {
+        power_source: state.electrical.source,
+        battery_percent: Math.round(state.electrical.batteryPercent),
+        battery_voltage_v: Number(state.electrical.voltage.toFixed(1)),
+        current_draw_ma: Math.round(state.electrical.current),
+        est_remaining_hours: Number(state.electrical.remainingHours.toFixed(1)),
+        motor_temp_c: Number(state.electrical.motorTemp.toFixed(1))
+      },
+      alerts: state.alerts.filter(a => a.active).map(a => ({ code: a.code, level: a.level }))
+    };
+  }
+
+  function addLog() {
+    state.logs.unshift({ timestamp: new Date().toISOString(), payload: buildPayload() });
+    if (state.logs.length > 60) state.logs.pop();
+    state.trendBuffer.push({
+      t: Date.now(),
+      pip: state.vitals.pip, peep: state.vitals.peep,
+      tv: state.vitals.tidalVolume, mv: (state.vitals.tidalVolume * state.vitals.deliveredBpm) / 1000,
+      spo2: state.vitals.spo2
+    });
+    // Keep 5 min
+    const cutoff = Date.now() - 5 * 60 * 1000;
+    state.trendBuffer = state.trendBuffer.filter(p => p.t >= cutoff);
+    if (state.trendBuffer.length % 5 === 0) pushTrendChart();
+    renderLogs();
+  }
+
+  // ===========================================================
+  // EXPORTS
+  // ===========================================================
+  function download(name, mime, data) {
+    const blob = new Blob([data], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 500);
+  }
+
+  function exportJSON() {
+    const data = {
+      exported_at: new Date().toISOString(),
+      device: state.device, session_id: state.sessionId, operator_id: state.operatorId,
+      patient: state.patient, logs: state.logs
+    };
+    download(`vent-logs-${Date.now()}.json`, "application/json", JSON.stringify(data, null, 2));
+    toast("JSON exported");
+  }
+
+  function exportCSV() {
+    const rows = [["timestamp","device","session","mode","spo2","hr","rr","tv","mv","pip","peep","fio2"]];
+    state.logs.forEach(l => {
+      const v = l.payload.vitals;
+      rows.push([l.timestamp, l.payload.device_id, l.payload.session_id, l.payload.mode,
+        v.spo2_percent, v.heart_rate_bpm, v.resp_rate, v.tidal_volume_ml, v.minute_volume_lpm,
+        v.pip_cmH2O, v.peep_cmH2O, v.fio2_percent]);
+    });
+    const csv = rows.map(r => r.join(",")).join("\n");
+    download(`vent-logs-${Date.now()}.csv`, "text/csv", csv);
+    toast("CSV exported");
+  }
+
+  function exportPDF() {
+    try {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      doc.setFontSize(16); doc.text("Ventilator Session Report", 14, 18);
+      doc.setFontSize(10);
+      doc.text(`Device: ${state.device.id}  ·  Session: ${state.sessionId}`, 14, 26);
+      doc.text(`Operator: ${state.operatorId}  ·  Generated: ${new Date().toLocaleString()}`, 14, 32);
+      doc.text(`Patient: ${state.patient.name || "—"} (${state.patient.id || "—"})`, 14, 38);
+      doc.text(`Mode: ${state.mode}  ·  Scenario: ${state.scenario}  ·  FiO2: ${state.fio2}%`, 14, 44);
+      doc.line(14, 48, 196, 48);
+      doc.setFontSize(12); doc.text("Latest vitals", 14, 56);
+      doc.setFontSize(10);
+      const v = state.vitals;
+      doc.text(`SpO2: ${Math.round(v.spo2)}%   HR: ${Math.round(v.hr)} bpm   RR: ${Math.round(v.respRate)}/min`, 14, 64);
+      doc.text(`TV: ${Math.round(v.tidalVolume)} mL   PIP: ${fmt(v.pip)}   PEEP: ${fmt(v.peep)}   Plateau: ${fmt(v.plateau)} cmH2O`, 14, 70);
+      doc.text(`MV: ${fmt((v.tidalVolume*v.deliveredBpm)/1000,1)} L/min   I:E: ${v.ie}`, 14, 76);
+      doc.text(`Battery: ${Math.round(state.electrical.batteryPercent)}%   Motor: ${fmt(state.electrical.motorTemp)} °C`, 14, 82);
+      doc.text("Active alerts: " + (state.alerts.filter(a=>a.active).map(a=>a.code).join(", ") || "None"), 14, 88);
+      doc.save(`vent-report-${Date.now()}.pdf`);
+      toast("PDF exported");
+    } catch(e) { toast("PDF export failed"); }
+  }
+
+  function exportFHIR() {
+    const p = state.patient;
+    const v = state.vitals;
+    const bundle = {
+      resourceType: "Bundle",
+      type: "collection",
+      timestamp: new Date().toISOString(),
+      entry: [
+        { resource: {
+          resourceType: "Patient",
+          id: p.id || "unknown",
+          name: [{ text: p.name || "Anonymous" }],
+          gender: p.gender === "M" ? "male" : p.gender === "F" ? "female" : "other",
+          birthDate: p.age ? new Date(new Date().getFullYear() - p.age, 0, 1).toISOString().slice(0,10) : undefined
+        }},
+        { resource: {
+          resourceType: "Device",
+          id: state.device.id,
+          identifier: [{ system: "urn:vent", value: state.device.serial }],
+          version: { value: state.device.firmware },
+          type: { text: "Ventilator" }
+        }},
+        { resource: {
+          resourceType: "Observation",
+          status: "final",
+          code: { coding: [{ system: "http://loinc.org", code: "59408-5", display: "SpO2" }] },
+          valueQuantity: { value: Math.round(v.spo2), unit: "%" }
+        }},
+        { resource: {
+          resourceType: "Observation",
+          status: "final",
+          code: { coding: [{ system: "http://loinc.org", code: "8867-4", display: "Heart rate" }] },
+          valueQuantity: { value: Math.round(v.hr), unit: "bpm" }
+        }},
+        { resource: {
+          resourceType: "Observation",
+          status: "final",
+          code: { coding: [{ system: "http://loinc.org", code: "33452-4", display: "Respiratory rate" }] },
+          valueQuantity: { value: Math.round(v.respRate), unit: "/min" }
+        }}
+      ]
+    };
+    download(`vent-fhir-${Date.now()}.json`, "application/fhir+json", JSON.stringify(bundle, null, 2));
+    toast("FHIR bundle exported");
+  }
+
+  function exportTrendCSV() {
+    const rows = [["timestamp","pip","peep","tv","mv","spo2"]];
+    state.trendBuffer.forEach(p => rows.push([new Date(p.t).toISOString(), p.pip, p.peep, p.tv, p.mv, p.spo2]));
+    download(`vent-trends-${Date.now()}.csv`, "text/csv", rows.map(r => r.join(",")).join("\n"));
+    toast("Trends CSV exported");
+  }
+
+  // ===========================================================
+  // WAVEFORM CANVASES
+  // ===========================================================
+  const pressureHist = [], flowHist = [], volumeHist = [], pvHist = [], fvHist = [];
+  const WAVE_MAX = 240;
+  const PHASE_COLORS = { insp: "#10b981", plat: "#f59e0b", exp: "#f43f5e", paused: "#64748b" };
+
+  function setupWaveCanvas(id) {
+    const c = document.getElementById(id);
+    function resize() {
+      const dpr = window.devicePixelRatio || 1;
+      c.width = c.clientWidth * dpr;
+      c.height = c.clientHeight * dpr;
+    }
+    window.addEventListener("resize", resize);
+    resize();
+    return c;
+  }
+
+  const pressCanvas = setupWaveCanvas("pressureWave");
+  const flowCanvas = setupWaveCanvas("flowWave");
+  const volCanvas  = setupWaveCanvas("volumeWave");
+  const pvCanvas   = setupWaveCanvas("pvLoop");
+  const fvCanvas   = setupWaveCanvas("fvLoop");
+
+  // Color-coded scrolling waveform (green insp / amber plat / red exp)
+  function drawColoredWave(canvas, hist, max, mid, amp) {
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.width, h = canvas.height;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, w, h);
+    if (!w || hist.length < 2) return;
+
+    ctx.lineWidth = 2 * dpr;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    // Zero line
+    ctx.strokeStyle = "#1e293b";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2, 4]);
+    ctx.beginPath();
+    ctx.moveTo(0, mid); ctx.lineTo(w, mid);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Group consecutive same-phase samples, draw each segment in phase color
+    let i = 0;
+    while (i < hist.length) {
+      const phase = state.paused ? "paused" : (hist[i].phase || "exp");
+      let j = i;
+      while (j < hist.length) {
+        const p2 = state.paused ? "paused" : (hist[j].phase || "exp");
+        if (p2 !== phase) break;
+        j++;
+      }
+      ctx.strokeStyle = PHASE_COLORS[phase] || "#38bdf8";
+      ctx.lineWidth = 2 * dpr;
+      ctx.beginPath();
+      for (let k = i; k < j; k++) {
+        const x = (k / WAVE_MAX) * w;
+        const y = mid - (hist[k].v / max) * amp;
+        if (k === i) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      if (j > i) ctx.stroke();
+      i = j;
+    }
+  }
+
+  function drawPVLoop() {
+    const dpr = window.devicePixelRatio || 1;
+    const w = pvCanvas.width, h = pvCanvas.height;
+    const ctx = pvCanvas.getContext("2d");
+    ctx.clearRect(0, 0, w, h);
+    if (!w) return;
+    // axes
+    ctx.strokeStyle = "#1e293b"; ctx.lineWidth = 1 * dpr;
+    ctx.beginPath();
+    ctx.moveTo(0, h - 1); ctx.lineTo(w, h - 1);
+    ctx.moveTo(0, 0); ctx.lineTo(0, h);
+    ctx.stroke();
+    // loop
+    const vMax = 600; const pMax = 45;
+    ctx.strokeStyle = state.paused ? "#64748b" : "#a78bfa";
+    ctx.lineWidth = 2 * dpr;
+    ctx.beginPath();
+    for (let i = 0; i < pvHist.length; i++) {
+      const x = (pvHist[i].v / vMax) * w;
+      const y = h - (pvHist[i].p / pMax) * h;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    // trail fill
+    if (pvHist.length > 1) {
+      ctx.fillStyle = "rgba(167,139,250,0.08)";
+      ctx.lineTo((pvHist[pvHist.length-1].v/vMax)*w, h);
+      ctx.lineTo((pvHist[0].v/vMax)*w, h);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  function drawFVLoop() {
+    const dpr = window.devicePixelRatio || 1;
+    const w = fvCanvas.width, h = fvCanvas.height;
+    const ctx = fvCanvas.getContext("2d");
+    ctx.clearRect(0, 0, w, h);
+    if (!w) return;
+    // axes
+    ctx.strokeStyle = "#1e293b"; ctx.lineWidth = 1 * dpr;
+    ctx.beginPath();
+    ctx.moveTo(0, h/2); ctx.lineTo(w, h/2);  // flow = 0 line
+    ctx.moveTo(0, 0); ctx.lineTo(0, h);       // vol = 0 line
+    ctx.stroke();
+    // loop
+    const vMax = 600; const fMax = 60;
+    ctx.strokeStyle = state.paused ? "#64748b" : "#34d399";
+    ctx.lineWidth = 2 * dpr;
+    ctx.beginPath();
+    for (let i = 0; i < fvHist.length; i++) {
+      const x = (fvHist[i].v / vMax) * w;
+      const y = h/2 - (fvHist[i].f / fMax) * (h/2);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    // trail fill
+    if (fvHist.length > 1) {
+      ctx.fillStyle = "rgba(52,211,153,0.08)";
+      ctx.lineTo((fvHist[fvHist.length-1].v/vMax)*w, h/2);
+      ctx.lineTo((fvHist[0].v/vMax)*w, h/2);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  let lastBreathPhase = "exp";
+  function drawAllWaves() {
+    const cyc = breathCycleUpdate();
+    if (!state.paused) {
+      state.vitals.currentPressure = cyc.pressure;
+      state.vitals.currentFlow = cyc.flow;
+      state.vitals.currentVolume = cyc.volume;
+      state.vitals.currentPhase = cyc.phase;
+    } else {
+      state.vitals.currentPressure = 0;
+      state.vitals.currentFlow = 0;
+      state.vitals.currentVolume = 0;
+      state.vitals.currentPhase = "paused";
+    }
+    // Cycle count: each transition from "exp" to "insp" = one completed breath
+    if (cyc.phase === "insp" && lastBreathPhase === "exp") {
+      state.vitals.cycleCount++;
+    }
+    lastBreathPhase = cyc.phase;
+
+    pressureHist.push({ v: state.vitals.currentPressure, phase: state.vitals.currentPhase });
+    flowHist.push({ v: state.vitals.currentFlow, phase: state.vitals.currentPhase });
+    volumeHist.push({ v: state.vitals.currentVolume, phase: state.vitals.currentPhase });
+    pvHist.push({ p: state.vitals.currentPressure, v: state.vitals.currentVolume });
+    fvHist.push({ f: state.vitals.currentFlow, v: state.vitals.currentVolume });
+    if (pressureHist.length > WAVE_MAX) pressureHist.shift();
+    if (flowHist.length > WAVE_MAX) flowHist.shift();
+    if (volumeHist.length > WAVE_MAX) volumeHist.shift();
+    if (pvHist.length > WAVE_MAX) pvHist.shift();
+    if (fvHist.length > WAVE_MAX) fvHist.shift();
+
+    drawColoredWave(pressCanvas, pressureHist, 45, pressCanvas.height*0.7, pressCanvas.height*0.6);
+    drawColoredWave(flowCanvas, flowHist, 60, flowCanvas.height*0.5, flowCanvas.height*0.45);
+    drawColoredWave(volCanvas, volumeHist, 600, volCanvas.height*0.85, volCanvas.height*0.7);
+    drawPVLoop();
+    drawFVLoop();
+
+    requestAnimationFrame(drawAllWaves);
+  }
+
+  // ===========================================================
+  // TREND CHART (Chart.js)
+  // ===========================================================
+  let trendChart = null;
+  function initTrendChart() {
+    const ctx = document.getElementById("trendChart");
+    trendChart = new Chart(ctx, {
+      type: "line",
+      data: { labels: [], datasets: [
+        { label: "PIP",  data: [], borderColor: "#38bdf8", tension: 0.3, pointRadius: 0, borderWidth: 2 },
+        { label: "PEEP", data: [], borderColor: "#a78bfa", tension: 0.3, pointRadius: 0, borderWidth: 2 },
+        { label: "TV/10",data: [], borderColor: "#fbbf24", tension: 0.3, pointRadius: 0, borderWidth: 2, yAxisID: "y1" }
+      ]},
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: "#cbd5e1", font: { size: 10 } } } },
+        scales: {
+          x: { ticks: { color: "#64748b", font:{size:9}, maxTicksLimit: 6 }, grid: { color: "#1e293b" } },
+          y: { position: "left", ticks: { color: "#64748b", font:{size:9} }, grid: { color: "#1e293b" } },
+          y1: { position: "right", ticks: { color: "#64748b", font:{size:9} }, grid: { drawOnChartArea: false } }
+        }
+      }
+    });
+  }
+
+  function pushTrendChart() {
+    if (!trendChart) return;
+    const last = state.trendBuffer.slice(-60);
+    trendChart.data.labels = last.map(p => new Date(p.t).toLocaleTimeString().slice(0,5));
+    trendChart.data.datasets[0].data = last.map(p => p.pip);
+    trendChart.data.datasets[1].data = last.map(p => p.peep);
+    trendChart.data.datasets[2].data = last.map(p => p.tv / 10);
+    trendChart.update("none");
+    refreshTrendAverages();
+  }
+
+  function refreshTrendAverages() {
+    if (!state.trendBuffer.length) return;
+    const avg = (k) => state.trendBuffer.reduce((s,p)=>s+p[k],0) / state.trendBuffer.length;
+    els.pipAvg.textContent = fmt(avg("pip"), 1);
+    els.peepAvg.textContent = fmt(avg("peep"), 1);
+    els.tvAvg.textContent = Math.round(avg("tv"));
+    els.mvAvg.textContent = fmt(avg("mv"), 1);
+  }
+
+  // ===========================================================
+  // PIN FLOW
+  // ===========================================================
+  let pinCallback = null;
+  let pinInput = "";
+  function openPinPrompt(title, sub, cb) {
+    pinCallback = cb;
+    pinInput = "";
+    document.getElementById("pinPromptTitle").textContent = title;
+    document.getElementById("pinPromptSub").textContent = sub;
+    document.getElementById("pinPromptError").classList.add("hidden");
+    updatePinPromptDots();
+    document.getElementById("modal-pin").classList.remove("hidden");
+    document.getElementById("modal-pin").classList.add("grid");
+  }
+  function closePinPrompt() {
+    document.getElementById("modal-pin").classList.add("hidden");
+    document.getElementById("modal-pin").classList.remove("grid");
+    pinCallback = null; pinInput = "";
+  }
+  function updatePinPromptDots() {
+    document.querySelectorAll(".pinp-dot").forEach((d,i) => {
+      d.classList.toggle("bg-sky-400", i < pinInput.length);
+      d.classList.toggle("border-sky-400", i < pinInput.length);
+    });
+  }
+  function pinKey(k) {
+    if (k === "clear") pinInput = "";
+    else if (k === "del") pinInput = pinInput.slice(0, -1);
+    else if (pinInput.length < 4) pinInput += k;
+    updatePinPromptDots();
+    if (pinInput.length === 4) {
+      if (pinInput === state.pin) {
+        closePinPrompt();
+        if (pinCallback) pinCallback();
+      } else {
+        document.getElementById("pinPromptError").classList.remove("hidden");
+        setTimeout(() => { pinInput = ""; updatePinPromptDots(); document.getElementById("pinPromptError").classList.add("hidden"); }, 700);
+      }
+    }
+  }
+
+  // ===========================================================
+  // LOCK SCREEN
+  // ===========================================================
+  let lockInput = "";
+  function setupLock() {
+    const dots = document.querySelectorAll("#pinDots .pin-dot");
+    function updateDots() {
+      dots.forEach((d, i) => {
+        d.classList.toggle("bg-sky-400", i < lockInput.length);
+        d.classList.toggle("border-sky-400", i < lockInput.length);
+      });
+    }
+    document.querySelectorAll(".pin-key").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const k = btn.dataset.k;
+        if (k === "clear") lockInput = "";
+        else if (k === "del") lockInput = lockInput.slice(0, -1);
+        else if (lockInput.length < 4) lockInput += k;
+        updateDots();
+        if (lockInput.length === 4) {
+          if (lockInput === state.pin) {
+            document.getElementById("lockScreen").classList.add("hidden");
+            document.getElementById("app").classList.remove("hidden");
+          } else {
+            document.getElementById("pinError").classList.remove("hidden");
+            setTimeout(() => { lockInput = ""; updateDots(); document.getElementById("pinError").classList.add("hidden"); }, 800);
+          }
+        }
+      });
+    });
+  }
+
+  // ===========================================================
+  // EVENTS
+  // ===========================================================
+  function attachEvents() {
+    // Nav
+    document.querySelectorAll(".nav-btn").forEach(btn => {
+      btn.addEventListener("click", () => showScreen(btn.dataset.screen));
+    });
+
+    // Modal close
+    document.querySelectorAll(".modal-close").forEach(btn => {
+      btn.addEventListener("click", () => {
+        btn.closest("[id^='modal-']").classList.add("hidden");
+        btn.closest("[id^='modal-']").classList.remove("grid");
+      });
+    });
+
+    // Mode
+    document.getElementById("modeBtn").addEventListener("click", () => {
+      openPinPrompt("Confirm Mode Change", "Enter PIN to change ventilation mode", () => {
+        document.getElementById("modal-mode").classList.remove("hidden");
+        document.getElementById("modal-mode").classList.add("grid");
+      });
+    });
+    document.querySelectorAll(".mode-opt").forEach(b => {
+      b.addEventListener("click", () => {
+        state.mode = b.dataset.mode;
+        addAlert("MODE_CHANGE", `Mode set to ${state.mode} (demo).`, "info");
+        document.getElementById("modal-mode").classList.add("hidden");
+        document.getElementById("modal-mode").classList.remove("grid");
+        render();
+        toast("Mode: " + state.mode);
+      });
+    });
+
+    // Scenario
+    document.getElementById("scenarioBtn").addEventListener("click", () => {
+      document.getElementById("modal-scenario").classList.remove("hidden");
+      document.getElementById("modal-scenario").classList.add("grid");
+    });
+    document.querySelectorAll(".scn-opt").forEach(b => {
+      b.addEventListener("click", () => {
+        applyScenario(b.dataset.scenario);
+        document.getElementById("modal-scenario").classList.add("hidden");
+        document.getElementById("modal-scenario").classList.remove("grid");
+      });
+    });
+
+    // E-stop
+    let holdTimer = null;
+    function startHold(e) {
+      if (state.paused) return;
+      e.preventDefault();
+      els.estopBtn.classList.add("scale-[0.98]", "bg-red-500");
+      holdTimer = setTimeout(() => {
+        document.getElementById("modal-estop").classList.remove("hidden");
+        document.getElementById("modal-estop").classList.add("grid");
+      }, 1500);
+    }
+    function cancelHold() { clearTimeout(holdTimer); els.estopBtn.classList.remove("scale-[0.98]", "bg-red-500"); }
+    els.estopBtn.addEventListener("pointerdown", startHold);
+    els.estopBtn.addEventListener("pointerup", cancelHold);
+    els.estopBtn.addEventListener("pointerleave", cancelHold);
+    els.estopBtn.addEventListener("touchstart", startHold, { passive: false });
+    els.estopBtn.addEventListener("touchend", cancelHold);
+
+    document.getElementById("estopCancel").addEventListener("click", () => {
+      document.getElementById("modal-estop").classList.add("hidden");
+      document.getElementById("modal-estop").classList.remove("grid");
+    });
+    document.getElementById("estopConfirm").addEventListener("click", () => {
+      state.paused = true;
+      addAlert("EMERGENCY_STOP", "Emergency stop requested (demo). Hardware supervisor required in real device.", "critical");
+      document.getElementById("modal-estop").classList.add("hidden");
+      document.getElementById("modal-estop").classList.remove("grid");
+      render();
+    });
+
+    // Ack alarm
+    els.ackAlarmBtn.addEventListener("click", () => {
+      state.alerts.forEach(a => { if (a.level === "critical" || a.level === "high") a.active = false; });
+      audioStop();
+      renderAlerts(); updateAlarmBanner();
+    });
+    els.ackAllBtn.addEventListener("click", () => {
+      state.alerts.forEach(a => a.active = false);
+      audioStop();
+      renderAlerts(); updateAlarmBanner();
+    });
+    els.clearAlertsBtn.addEventListener("click", () => { state.alerts = []; renderAlerts(); updateAlarmBanner(); });
+
+    // Logs
+    els.exportJsonBtn.addEventListener("click", exportJSON);
+    els.exportCsvBtn.addEventListener("click", exportCSV);
+    els.exportPdfBtn.addEventListener("click", exportPDF);
+    els.exportFhirBtn.addEventListener("click", exportFHIR);
+    els.clearLogsBtn.addEventListener("click", () => { state.logs = []; renderLogs(); });
+    els.exportTrendBtn.addEventListener("click", exportTrendCSV);
+
+    // Settings
+    els.themeToggle.addEventListener("click", () => {
+      state.settings.darkTheme = !state.settings.darkTheme;
+      document.body.classList.toggle("theme-light", !state.settings.darkTheme);
+      render(); persist();
+    });
+    els.audioToggle.addEventListener("click", () => {
+      state.settings.audioOn = !state.settings.audioOn;
+      if (!state.settings.audioOn) audioStop();
+      render();
+    });
+    els.setHiPress.addEventListener("input", e => { state.settings.hiPressure = +e.target.value; els.setHiPressVal.textContent = e.target.value; persist(); });
+    els.setLoPip.addEventListener("input", e => { state.settings.loPressure = +e.target.value; els.setLoPipVal.textContent = e.target.value; persist(); });
+    els.setLoMv.addEventListener("input", e => { state.settings.loMv = +e.target.value; els.setLoMvVal.textContent = (+e.target.value).toFixed(1); persist(); });
+    els.setLowSpo2.addEventListener("input", e => { state.settings.lowSpo2 = +e.target.value; els.setLowSpo2Val.textContent = e.target.value; persist(); });
+    els.setLowBatt.addEventListener("input", e => { state.settings.lowBatt = +e.target.value; els.setLowBattVal.textContent = e.target.value; persist(); });
+    els.setExpSens.addEventListener("input", e => { state.settings.expSens = +e.target.value; els.setExpSensVal.textContent = e.target.value; persist(); });
+    els.setRiseTime.addEventListener("input", e => { state.settings.riseTime = +e.target.value; els.setRiseTimeVal.textContent = e.target.value; persist(); });
+    els.apneaBackupToggle.addEventListener("click", () => {
+      openPinPrompt("Toggle Apnea Backup", "Enter PIN to change", () => {
+        state.settings.apneaBackup = !state.settings.apneaBackup;
+        render();
+        toast(state.settings.apneaBackup ? "Apnea backup ON" : "Apnea backup OFF");
+        persist();
+      });
+    });
+
+    // Display options
+    els.optShowPv.addEventListener("change", e => { state.display.showPv = e.target.checked; render(); persist(); });
+    els.optShowFv.addEventListener("change", e => { state.display.showFv = e.target.checked; render(); persist(); });
+    els.optShowTrach.addEventListener("change", e => { state.display.showTrach = e.target.checked; render(); persist(); });
+    els.optShowCycle.addEventListener("change", e => { state.display.showCycle = e.target.checked; render(); persist(); });
+
+    // Clinical actions (PIN-gated)
+    els.inspHoldBtn.addEventListener("click", () => {
+      openPinPrompt("Hold Inspiration", "Enter PIN to hold", () => {
+        addAlert("INSP_HOLD", "Inspiration hold requested (demo). Real device: Pneumatic valve paused for 1-2s.", "info");
+        toast("Inspiration held for 2s (demo)");
+      });
+    });
+    els.manualBreathBtn.addEventListener("click", () => {
+      openPinPrompt("Manual Breath", "Enter PIN to deliver", () => {
+        state.vitals.cycleCount++;
+        addAlert("MANUAL_BREATH", "Manual breath delivered (demo).", "info");
+        toast("Manual breath delivered");
+        render();
+      });
+    });
+    els.preOxyBtn.addEventListener("click", () => {
+      openPinPrompt("Pre-oxygenate", "Enter PIN to start", () => {
+        const oldFio2 = state.fio2;
+        state.fio2 = 100;
+        addAlert("PRE_OXY", "Pre-oxygenation started: FiO₂ 100% for 2 min (demo).", "high");
+        toast("100% O₂ × 2 min started");
+        render();
+        setTimeout(() => {
+          state.fio2 = oldFio2;
+          addAlert("PRE_OXY_END", "Pre-oxygenation complete. FiO₂ restored.", "info");
+          render();
+        }, 2000);
+      });
+    });
+
+    els.setHiPressVal.textContent = state.settings.hiPressure;
+    els.setLoPipVal.textContent = state.settings.loPressure;
+    els.setLoMvVal.textContent = state.settings.loMv.toFixed(1);
+    els.setLowSpo2Val.textContent = state.settings.lowSpo2;
+    els.setLowBattVal.textContent = state.settings.lowBatt;
+    els.setExpSensVal.textContent = state.settings.expSens;
+    els.setRiseTimeVal.textContent = state.settings.riseTime;
+
+    els.changePinBtn.addEventListener("click", () => {
+      openPinPrompt("Set New PIN", "Enter current PIN, then new PIN", () => {
+        let newPin = prompt("Enter new 4-digit PIN:");
+        if (newPin && /^\d{4}$/.test(newPin)) { state.pin = newPin; persist(); toast("PIN updated"); }
+        else if (newPin) toast("PIN must be 4 digits");
+      });
+    });
+
+    // Patient
+    els.savePatientBtn.addEventListener("click", () => {
+      state.patient.name = els.ptName.value.trim();
+      state.patient.id = els.ptId.value.trim();
+      state.patient.age = +els.ptAge.value || 0;
+      state.patient.gender = els.ptGender.value;
+      state.patient.height = +els.ptHeight.value || 0;
+      state.patient.weight = +els.ptWeight.value || 0;
+      addAlert("PATIENT_SAVED", `Patient ${state.patient.name || "—"} (${state.patient.id || "—"}) saved.`, "info");
+      persist();
+      toast("Patient saved");
+    });
+
+    // Reset
+    els.resetDemoBtn.addEventListener("click", () => {
+      openPinPrompt("Reset Demo", "Enter PIN to reset demo state", () => {
+        const fresh = JSON.parse(JSON.stringify(defaultState));
+        Object.assign(state, fresh);
+        state.sessionId = "SES-" + Math.random().toString(36).slice(2, 8).toUpperCase();
+        addAlert("SYSTEM_RESET", "Demo state reset.", "info");
+        render(); renderAlerts(); renderLogs(); updateAlarmBanner();
+        persist();
+        toast("Demo reset");
+      });
+    });
+
+    // OTA
+    els.otaBtn.addEventListener("click", () => {
+      document.getElementById("modal-ota").classList.remove("hidden");
+      document.getElementById("modal-ota").classList.add("grid");
+      document.getElementById("otaStatus").textContent = "Checking for updates…";
+      document.getElementById("otaBar").style.width = "5%";
+      document.getElementById("otaDetail").textContent = "";
+      let p = 5;
+      const iv = setInterval(() => {
+        p += Math.random() * 12;
+        if (p >= 100) {
+          p = 100;
+          clearInterval(iv);
+          document.getElementById("otaStatus").textContent = "Update available: 0.3.0";
+          document.getElementById("otaDetail").textContent = "Demo only. Real OTA needs signed firmware, rollback plan, and clinical validation.";
+        } else {
+          document.getElementById("otaStatus").textContent = `Downloading… ${Math.round(p)}%`;
+        }
+        document.getElementById("otaBar").style.width = p + "%";
+      }, 250);
+    });
+
+    // PIN prompt keys
+    document.querySelectorAll(".pinp-key").forEach(b => b.addEventListener("click", () => pinKey(b.dataset.k)));
+  }
+
+  // ===========================================================
+  // INIT
+  // ===========================================================
+  function init() {
+    bindEls();
+    setupLock();
+    attachEvents();
+    showScreen("home");
+    render();
+    renderAlerts();
+    renderLogs();
+    updateAlarmBanner();
+    if (!state.settings.darkTheme) document.body.classList.add("theme-light");
+    addAlert("SYSTEM_READY", `Dashboard ready. Mode ${state.mode}. Operator ${state.operatorId}.`, "info");
+    initTrendChart();
+    setInterval(() => { simulateData(); render(); addLog(); }, 1000);
+    requestAnimationFrame(drawAllWaves);
+  }
+
+  document.addEventListener("DOMContentLoaded", init);
+  </script>
+</body>
+</html>

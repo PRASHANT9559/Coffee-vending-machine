@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Customer App — Architecture & Design</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  .gradient-bg { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+  .card { background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .pill-green { background: #d1fae5; color: #065f46; }
+  .pill-amber { background: #fef3c7; color: #92400e; }
+  .pill-red { background: #fee2e2; color: #991b1b; }
+  .pill-blue { background: #dbeafe; color: #1e40af; }
+  .pill-purple { background: #ede9fe; color: #5b21b6; }
+  .pill-pink { background: #fce7f3; color: #9f1239; }
+  pre { background: #1e293b; color: #e2e8f0; padding: 16px; border-radius: 8px; overflow-x: auto; font-size: 11px; line-height: 1.5; }
+  code.inline { background: #f1f5f9; color: #0f172a; padding: 2px 6px; border-radius: 4px; font-size: 13px; font-family: 'SF Mono', Monaco, monospace; }
+  .screen-mock { background: #0f172a; border-radius: 32px; padding: 12px; max-width: 240px; margin: 0 auto; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+  .screen-inner { background: white; border-radius: 24px; height: 420px; overflow: hidden; display: flex; flex-direction: column; }
+  .screen-header { background: #f8fafc; padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 12px; font-weight: 600; }
+  .screen-body { padding: 12px; flex: 1; overflow-y: auto; font-size: 11px; }
+  .screen-status { display: flex; justify-content: space-between; padding: 3px 12px; font-size: 9px; color: #64748b; background: #f8fafc; }
+  .btn-primary { background: linear-gradient(135deg, #f5576c 0%, #f093fb 100%); color: white; padding: 6px 12px; border-radius: 6px; font-size: 11px; font-weight: 600; text-align: center; }
+  .btn-secondary { background: #e2e8f0; color: #1e293b; padding: 6px 12px; border-radius: 6px; font-size: 11px; font-weight: 600; text-align: center; }
+  .map-placeholder { background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%); height: 120px; border-radius: 8px; position: relative; overflow: hidden; }
+  .map-marker { position: absolute; width: 24px; height: 24px; background: #ef4444; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+  .map-marker.partner { background: #3b82f6; }
+  .map-marker.you { background: #ef4444; }
+  table { border-collapse: collapse; width: 100%; }
+  th { background: #f8fafc; text-align: left; padding: 8px 10px; font-size: 12px; color: #475569; font-weight: 600; border-bottom: 2px solid #e2e8f0; }
+  td { padding: 8px 10px; font-size: 12px; border-bottom: 1px solid #f1f5f9; }
+  tr:hover { background: #f8fafc; }
+</style>
+</head>
+<body class="bg-slate-50">
+
+<!-- HERO -->
+<section class="gradient-bg text-white py-16 px-6">
+  <div class="max-w-5xl mx-auto">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="pill pill-pink">Architecture v1.0</span>
+      <span class="pill pill-blue">Flutter + Supabase</span>
+      <span class="pill pill-green">Realtime + RLS</span>
+    </div>
+    <h1 class="text-5xl font-bold mb-4">Customer App — Full Architecture</h1>
+    <p class="text-xl opacity-90 mb-2">On-Demand Home Salon Platform</p>
+    <p class="text-sm opacity-75">9 Screens • Stripe Payments • Real-time Tracking • GDPR Compliant</p>
+    <div class="mt-6 flex flex-wrap gap-3">
+      <span class="text-xs bg-white/20 px-3 py-1 rounded-full">📱 Flutter (Android + iOS)</span>
+      <span class="text-xs bg-white/20 px-3 py-1 rounded-full">🗄️ Supabase Postgres + RLS</span>
+      <span class="text-xs bg-white/20 px-3 py-1 rounded-full">⚡ Realtime Subscriptions</span>
+      <span class="text-xs bg-white/20 px-3 py-1 rounded-full">💳 Stripe Payment Sheet</span>
+      <span class="text-xs bg-white/20 px-3 py-1 rounded-full">🔔 FCM Push</span>
+    </div>
+  </div>
+</section>
+
+<!-- ARCHITECTURE OVERVIEW -->
+<section class="max-w-6xl mx-auto px-6 py-12">
+  <h2 class="text-3xl font-bold mb-6">1. System Architecture</h2>
+  <div class="card p-6 mb-6">
+    <div class="mermaid">
+graph TB
+    A[Customer App<br/>Flutter] -->|REST + Realtime| B[Supabase]
+    B --> C[Postgres<br/>with RLS]
+    B --> D[Auth<br/>Phone OTP]
+    B --> E[Realtime<br/>WebSocket]
+    B --> F[Storage<br/>CDN]
+    B --> G[Edge Functions<br/>Deno Runtime]
+    
+    G --> H[Stripe API]
+    G --> I[Dispatch Engine]
+    G --> J[FCM Push]
+    
+    A -.->|Embeds| K[Stripe<br/>Payment Sheet]
+    A -.->|Embeds| L[Google Maps<br/>SDK]
+    
+    M[Partner App] -.->|Writes location| C
+    I -->|Reads partners| C
+    I -->|Updates booking| C
+    
+    style A fill:#fce7f3,stroke:#9f1239
+    style M fill:#ede9fe,stroke:#5b21b6
+    style B fill:#d1fae5,stroke:#065f46
+    </div>
+  </div>
+  
+  <div class="grid md:grid-cols-3 gap-4">
+    <div class="card p-5">
+      <h4 class="font-bold mb-2 text-pink-700">📱 Client (Flutter)</h4>
+      <ul class="text-sm space-y-1 text-slate-600">
+        <li>• Riverpod state management</li>
+        <li>• GoRouter for navigation</li>
+        <li>• Supabase Flutter SDK</li>
+        <li>• Stripe payment sheet</li>
+        <li>• Google Maps SDK</li>
+        <li>• FCM for push</li>
+      </ul>
+    </div>
+    <div class="card p-5">
+      <h4 class="font-bold mb-2 text-green-700">🗄️ Supabase Backend</h4>
+      <ul class="text-sm space-y-1 text-slate-600">
+        <li>• Postgres (primary DB)</li>
+        <li>• Auth (phone OTP)</li>
+        <li>• Realtime (channels)</li>
+        <li>• Storage (images/PDFs)</li>
+        <li>• Edge Functions (Deno)</li>
+        <li>• Row Level Security</li>
+      </ul>
+    </div>
+    <div class="card p-5">
+      <h4 class="font-bold mb-2 text-blue-700">🌐 External</h4>
+      <ul class="text-sm space-y-1 text-slate-600">
+        <li>• Stripe (payments)</li>
+        <li>• FCM (push notifications)</li>
+        <li>• Google Maps (geocoding)</li>
+        <li>• Apple/Google Pay</li>
+        <li>• Sentry (error tracking)</li>
+        <li>• Mixpanel (analytics)</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- STATE MACHINE -->
+<section class="bg-white py-12">
+  <div class="max-w-6xl mx-auto px-6">
+    <h2 class="text-3xl font-bold mb-2">2. Customer State Machine</h2>
+    <p class="text-slate-600 mb-6">Simpler than partner app — mostly browsing + one commit (payment).</p>
+    
+    <div class="card p-8 mb-6">
+      <div class="mermaid">
+stateDiagram-v2
+    [*] --> UNAUTHENTICATED
+    UNAUTHENTICATED --> AUTHENTICATED: Phone + OTP
+    AUTHENTICATED --> CONFIGURING: Select service
+    CONFIGURING --> AUTHENTICATED: Back
+    CONFIGURING --> PAYMENT_PROCESSING: Tap Pay
+    PAYMENT_PROCESSING --> BOOKING_ACTIVE: Stripe success
+    PAYMENT_PROCESSING --> CONFIGURING: Stripe failed (retry)
+    BOOKING_ACTIVE --> RATING_PENDING: Partner completes
+    RATING_PENDING --> COMPLETED: Submit rating
+    RATING_PENDING --> COMPLETED: Skip
+    COMPLETED --> AUTHENTICATED: Book again
+    COMPLETED --> [*]: Logout
+    BOOKING_ACTIVE --> CONFIGURING: Cancel before partner
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 9 SCREENS -->
+<section class="max-w-6xl mx-auto px-6 py-12">
+  <h2 class="text-3xl font-bold mb-6">3. The 9 Screens — Visual Tour</h2>
+  
+  <div class="grid md:grid-cols-3 lg:grid-cols-3 gap-6">
+    
+    <!-- Screen 1 -->
+    <div>
+      <div class="screen-mock mb-3">
+        <div class="screen-inner">
+          <div class="screen-status"><span>9:41</span><span>📶 5G 🔋</span></div>
+          <div class="screen-header text-center py-3">✂️ SalonAtHome</div>
+          <div class="screen-body text-center">
+            <div class="text-3xl mb-3">💇‍♀️</div>
+            <h3 class="font-bold text-sm mb-1">Willkommen!</h3>
+            <p class="text-xs text-slate-500 mb-4">Enter your phone to continue</p>
+            <div class="text-left text-xs mb-1">Phone</div>
+            <div class="bg-slate-100 rounded p-2 mb-3 text-xs">+49 176 ••• ••••</div>
+            <div class="btn-primary">Send Code</div>
+            <div class="text-xs text-slate-400 mt-3">DE / EN</div>
+          </div>
+        </div>
+      </div>
+      <h4 class="font-bold text-sm">1. Login / Onboarding</h4>
+      <p class="text-xs text-slate-600">Phone OTP + permissions setup</p>
+    </div>
+    
+    <!-- Screen 2 -->
+    <div>
+      <div class="screen-mock mb-3">
+        <div class="screen-inner">
+          <div class="screen-status"><span>9:41</span><span>📶 5G 🔋</span></div>
+          <div class="screen-header">📍 Berlin ▼  👤</div>
+          <div class="screen-body">
+            <div class="bg-slate-100 rounded p-2 mb-3 text-xs">🔍 Search...</div>
+            <div class="grid grid-cols-4 gap-1 mb-3">
+              <div class="bg-pink-100 rounded p-1 text-center text-xs">✂️<br/>Men</div>
+              <div class="bg-pink-100 rounded p-1 text-center text-xs">🧔<br/>Beard</div>
+              <div class="bg-pink-100 rounded p-1 text-center text-xs">💇‍♀️<br/>Women</div>
+              <div class="bg-pink-100 rounded p-1 text-center text-xs">👶<br/>Kids</div>
+            </div>
+            <div class="text-xs font-bold mb-1">Popular</div>
+            <div class="bg-slate-50 rounded p-2 mb-1 text-xs">✂️ Men's Haircut<br/>⭐ 4.8 • 45m • €35</div>
+            <div class="bg-slate-50 rounded p-2 text-xs">✂️ Haircut+Beard<br/>⭐ 4.9 • 60m • €50</div>
+          </div>
+        </div>
+      </div>
+      <h4 class="font-bold text-sm">2. Home / Browse</h4>
+      <p class="text-xs text-slate-600">Categories + popular services</p>
+    </div>
+    
+    <!-- Screen 3 -->
+    <div>
+      <div class="screen-mock mb-3">
+        <div class="screen-inner">
+          <div class="screen-status"><span>9:41</span><span>📶 5G 🔋</span></div>
+          <div class="screen-header">← Men's Haircut</div>
+          <div class="screen-body">
+            <div class="bg-slate-200 h-16 rounded mb-2 flex items-center justify-center text-xs">[Hero image]</div>
+            <div class="text-sm font-bold mb-1">Men's Haircut</div>
+            <div class="text-xs text-slate-500 mb-2">⭐ 4.8 • 45 min • €35</div>
+            <div class="text-xs font-bold mb-1">Add-ons</div>
+            <div class="space-y-1 text-xs">
+              <div>☐ Beard Oil +€5</div>
+              <div>☐ Scalp Massage +€8</div>
+              <div>☐ Eyebrows +€6</div>
+            </div>
+            <div class="btn-primary mt-3">CONTINUE</div>
+          </div>
+        </div>
+      </div>
+      <h4 class="font-bold text-sm">3. Service Detail</h4>
+      <p class="text-xs text-slate-600">Info + add-ons selection</p>
+    </div>
+    
+    <!-- Screen 4 -->
+    <div>
+      <div class="screen-mock mb-3">
+        <div class="screen-inner">
+          <div class="screen-status"><span>9:41</span><span>📶 5G 🔋</span></div>
+          <div class="screen-header">← Schedule</div>
+          <div class="screen-body">
+            <div class="text-xs font-bold mb-1">📍 Location</div>
+            <div class="bg-slate-100 rounded p-2 mb-3 text-xs">🏠 Karl-Marx-Allee 92<br/>3rd floor, Buzzer 204</div>
+            <div class="text-xs font-bold mb-1">📅 Date</div>
+            <div class="flex gap-1 mb-3">
+              <div class="bg-pink-500 text-white rounded p-1 text-xs text-center flex-1">Wed<br/>7</div>
+              <div class="bg-slate-100 rounded p-1 text-xs text-center flex-1">Thu<br/>8</div>
+              <div class="bg-slate-100 rounded p-1 text-xs text-center flex-1">Fri<br/>9</div>
+            </div>
+            <div class="text-xs font-bold mb-1">🕐 Time</div>
+            <div class="grid grid-cols-3 gap-1 text-xs">
+              <div class="bg-slate-100 p-1 rounded text-center">10:00</div>
+              <div class="bg-slate-100 p-1 rounded text-center">11:00</div>
+              <div class="bg-pink-500 text-white p-1 rounded text-center">16:00</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <h4 class="font-bold text-sm">4. Schedule Slot</h4>
+      <p class="text-xs text-slate-600">Address + date + time picker</p>
+    </div>
+    
+    <!-- Screen 5 -->
+    <div>
+      <div class="screen-mock mb-3">
+        <div class="screen-inner">
+          <div class="screen-status"><span>9:41</span><span>📶 5G 🔋</span></div>
+          <div class="screen-header">← Checkout</div>
+          <div class="screen-body">
+            <div class="bg-slate-50 rounded p-2 mb-2 text-xs">
+              <div class="flex justify-between"><span>Service</span><span>€35</span></div>
+              <div class="flex justify-between"><span>Add-ons</span><span>€13</span></div>
+              <div class="flex justify-between"><span>Fee</span><span>€2</span></div>
+              <div class="flex justify-between font-bold border-t mt-1 pt-1"><span>Total</span><span>€50</span></div>
+            </div>
+            <div class="text-xs font-bold mb-1">💚 Tip (optional)</div>
+            <div class="flex gap-1 mb-3">
+              <div class="bg-pink-100 text-pink-700 p-1 rounded text-xs flex-1 text-center">10%</div>
+              <div class="bg-pink-100 text-pink-700 p-1 rounded text-xs flex-1 text-center">15%</div>
+              <div class="bg-pink-100 text-pink-700 p-1 rounded text-xs flex-1 text-center">20%</div>
+            </div>
+            <div class="text-xs font-bold mb-1">💳 Pay</div>
+            <div class="bg-slate-100 rounded p-2 text-xs">Visa •••• 4242</div>
+            <div class="btn-primary mt-3">PAY €55</div>
+          </div>
+        </div>
+      </div>
+      <h4 class="font-bold text-sm">5. Checkout / Pay</h4>
+      <p class="text-xs text-slate-600">Tip + Stripe payment sheet</p>
+    </div>
+    
+    <!-- Screen 6 -->
+    <div>
+      <div class="screen-mock mb-3">
+        <div class="screen-inner">
+          <div class="screen-status"><span>9:41</span><span>📶 5G 🔋</span></div>
+          <div class="screen-header">#SAL-2847 • En Route</div>
+          <div class="screen-body">
+            <div class="text-center mb-2">
+              <div class="text-xs text-slate-500">ETA 12 min</div>
+              <div class="text-lg font-bold text-blue-600">🚗 On the way</div>
+            </div>
+            <div class="map-placeholder mb-2">
+              <div class="map-marker partner" style="top: 30px; left: 60px;">📍</div>
+              <div class="map-marker you" style="top: 80px; left: 130px;">🏠</div>
+            </div>
+            <div class="bg-slate-50 rounded p-2 mb-2 text-xs">
+              <b>Raj Kumar</b> ⭐ 4.8<br/>
+              <span class="text-blue-600">📞 Call</span> • <span class="text-blue-600">💬 Chat</span>
+            </div>
+            <div class="text-xs space-y-1">
+              <div>✅ Paid</div>
+              <div>✅ Partner assigned</div>
+              <div>🔵 En route</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <h4 class="font-bold text-sm">6. Live Tracking</h4>
+      <p class="text-xs text-slate-600">Real-time map + ETA + timeline</p>
+    </div>
+    
+    <!-- Screen 7 -->
+    <div>
+      <div class="screen-mock mb-3">
+        <div class="screen-inner">
+          <div class="screen-status"><span>9:41</span><span>📶 5G 🔋</span></div>
+          <div class="screen-header text-center">Service In Progress</div>
+          <div class="screen-body text-center">
+            <div class="text-3xl mb-2">🔐</div>
+            <div class="text-xs font-bold mb-2">Your Start PIN</div>
+            <div class="flex justify-center gap-2 mb-3">
+              <div class="w-10 h-12 bg-slate-100 rounded text-center text-xl font-bold flex items-center justify-center">4</div>
+              <div class="w-10 h-12 bg-slate-100 rounded text-center text-xl font-bold flex items-center justify-center">8</div>
+              <div class="w-10 h-12 bg-slate-100 rounded text-center text-xl font-bold flex items-center justify-center">2</div>
+              <div class="w-10 h-12 bg-slate-100 rounded text-center text-xl font-bold flex items-center justify-center">0</div>
+            </div>
+            <div class="text-xs text-slate-600 mb-3">Share with partner to start</div>
+            <div class="text-xs text-pink-600">⏱ Expires in 4:32</div>
+            <div class="bg-slate-50 rounded p-2 text-xs text-left mt-3">
+              ✓ Verify partner's name<br/>
+              ✓ Service starts after PIN
+            </div>
+          </div>
+        </div>
+      </div>
+      <h4 class="font-bold text-sm">7. PIN Display</h4>
+      <p class="text-xs text-slate-600">4-digit PIN to share with partner</p>
+    </div>
+    
+    <!-- Screen 8 -->
+    <div>
+      <div class="screen-mock mb-3">
+        <div class="screen-inner">
+          <div class="screen-status"><span>9:41</span><span>📶 5G 🔋</span></div>
+          <div class="screen-header text-center">🎉 Service Complete</div>
+          <div class="screen-body text-center">
+            <div class="text-xs mb-2">How was it?</div>
+            <div class="text-2xl mb-3">⭐⭐⭐⭐⭐</div>
+            <div class="text-xs text-left space-y-1 mb-3">
+              <div class="flex justify-between"><span>Punctuality</span><span>⭐⭐⭐⭐⭐</span></div>
+              <div class="flex justify-between"><span>Cleanliness</span><span>⭐⭐⭐⭐⭐</span></div>
+              <div class="flex justify-between"><span>Quality</span><span>⭐⭐⭐⭐⭐</span></div>
+            </div>
+            <div class="bg-slate-100 rounded p-2 mb-2 text-xs text-left">Comments...</div>
+            <div class="btn-primary mb-2">SUBMIT</div>
+            <div class="text-xs text-slate-500">Skip for now</div>
+          </div>
+        </div>
+      </div>
+      <h4 class="font-bold text-sm">8. Rate & Tip</h4>
+      <p class="text-xs text-slate-600">Star rating + comment + tip</p>
+    </div>
+    
+    <!-- Screen 9 -->
+    <div>
+      <div class="screen-mock mb-3">
+        <div class="screen-inner">
+          <div class="screen-status"><span>9:41</span><span>📶 5G 🔋</span></div>
+          <div class="screen-header">👤 Priya Sharma</div>
+          <div class="screen-body">
+            <div class="flex gap-1 mb-2 text-xs">
+              <div class="bg-pink-100 p-1 rounded flex-1 text-center font-bold">Bookings</div>
+              <div class="bg-slate-100 p-1 rounded flex-1 text-center">Addresses</div>
+              <div class="bg-slate-100 p-1 rounded flex-1 text-center">Payment</div>
+            </div>
+            <div class="text-xs font-bold mb-1">Upcoming</div>
+            <div class="bg-slate-50 rounded p-2 mb-2 text-xs">
+              Wed 16:00<br/>Men's Cut+Beard<br/>🚗 Active
+            </div>
+            <div class="text-xs font-bold mb-1">Past</div>
+            <div class="bg-slate-50 rounded p-2 text-xs">
+              Mon 11:00<br/>Women's Cut ⭐ 5<br/>€78 • [Re-book]
+            </div>
+            <div class="text-xs text-slate-500 mt-3">⚙ Settings • Logout</div>
+          </div>
+        </div>
+      </div>
+      <h4 class="font-bold text-sm">9. Profile & History</h4>
+      <p class="text-xs text-slate-600">Bookings + addresses + settings</p>
+    </div>
+    
+  </div>
+</section>
+
+<!-- REALTIME -->
+<section class="bg-white py-12">
+  <div class="max-w-6xl mx-auto px-6">
+    <h2 class="text-3xl font-bold mb-6">4. Supabase Realtime (The Magic)</h2>
+    <p class="text-slate-600 mb-6">Customer app is mostly a viewer. Realtime makes the tracking screen feel alive.</p>
+    
+    <div class="card p-6 mb-6">
+      <div class="mermaid">
+sequenceDiagram
+    participant C as Customer App
+    participant S as Supabase Realtime
+    participant P as Partner App
+    participant DB as Postgres
+    
+    Note over C,S: Customer opens tracking screen
+    C->>S: Subscribe to channel 'booking-2847'
+    S-->>C: Subscribed
+    
+    loop Every 15 seconds
+      P->>DB: UPDATE partners SET current_lat=..., current_lng=...
+      DB->>S: postgres_changes event
+      S-->>C: Push update
+      C->>C: Move map marker
+    end
+    
+    P->>DB: UPDATE bookings SET state='at_location'
+    DB->>S: postgres_changes event
+    S-->>C: State changed
+    C->>C: Show PIN screen
+    
+    P->>DB: UPDATE bookings SET state='in_service'
+    DB->>S: postgres_changes event
+    S-->>C: Service started
+    
+    P->>DB: UPDATE bookings SET state='completed'
+    DB->>S: postgres_changes event
+    S-->>C: Open rating modal
+    </div>
+    </div>
+
+    <div class="card p-4">
+      <h4 class="font-bold text-sm mb-2">🎯 Realtime Channels</h4>
+      <pre>// Subscribe to booking updates
+final channel = supabase.channel('booking-${bookingId}');
+
+channel.onPostgresChanges(
+  event: PostgresChangeEvent.update,
+  schema: 'public',
+  table: 'bookings',
+  filter: 'id=eq.$bookingId',
+  callback: (payload) => updateUI(payload.newRecord),
+);
+
+channel.onPostgresChanges(
+  event: PostgresChangeEvent.update,
+  schema: 'public',
+  table: 'partners',
+  filter: 'id=eq.$partnerId',
+  callback: (payload) => moveMarker(payload.newRecord),
+);
+
+channel.subscribe();</pre>
+    </div>
+  </div>
+</section>
+
+<!-- DATABASE SCHEMA -->
+<section class="max-w-6xl mx-auto px-6 py-12">
+  <h2 class="text-3xl font-bold mb-6">5. Database Schema (Supabase)</h2>
+  <div class="card p-6">
+    <div class="mermaid">
+erDiagram
+    CUSTOMERS ||--o{ BOOKINGS : creates
+    CUSTOMERS ||--o{ CUSTOMER_ADDRESSES : has
+    CUSTOMERS ||--o{ RATINGS : gives
+    CUSTOMERS ||--o{ SUPPORT_TICKETS : opens
+    BOOKINGS ||--|| PARTNERS : assigned_to
+    BOOKINGS ||--|| SERVICES : for
+    BOOKINGS ||--|| CUSTOMER_ADDRESSES : at
+    BOOKINGS ||--o{ BOOKING_TRANSITIONS : has
+    BOOKINGS ||--o| RATINGS : receives
+    SERVICES ||--o{ SERVICE_ADDONS : has
+    PARTNERS ||--o{ RATINGS : receives
+    
+    CUSTOMERS {
+        uuid id PK
+        string phone
+        string email
+        string first_name
+        string stripe_customer_id
+    }
+    BOOKINGS {
+        uuid id PK
+        string short_code
+        uuid customer_id FK
+        uuid partner_id FK
+        uuid service_id FK
+        uuid address_id FK
+        timestamp scheduled_at
+        int total_charged_cents
+        string state
+        text start_pin
+    }
+    SERVICES {
+        uuid id PK
+        string slug
+        string name_de
+        string name_en
+        int base_price_cents
+        int duration_min
+    }
+    PARTNERS {
+        uuid id PK
+        decimal rating_avg
+        int total_jobs
+        boolean is_online
+    }
+    RATINGS {
+        uuid id PK
+        uuid booking_id FK
+        int stars_overall
+        text comment
+    }
+    </div>
+  </div>
+</section>
+
+<!-- RLS -->
+<section class="bg-slate-900 text-white py-12">
+  <div class="max-w-6xl mx-auto px-6">
+    <h2 class="text-3xl font-bold mb-6">6. Row Level Security (CRITICAL)</h2>
+    <p class="text-slate-300 mb-6">Customer can ONLY access their own data. Enforced at database level.</p>
+    
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="bg-slate-800 p-5 rounded-lg">
+        <h4 class="font-bold mb-2">🔒 Customers Table</h4>
+        <pre>-- Users see only their own row
+CREATE POLICY "Users view own profile" 
+  ON customers FOR SELECT 
+  USING (id = auth.uid());
+
+CREATE POLICY "Users update own profile" 
+  ON customers FOR UPDATE 
+  USING (id = auth.uid());</pre>
+      </div>
+      <div class="bg-slate-800 p-5 rounded-lg">
+        <h4 class="font-bold mb-2">📋 Bookings Table</h4>
+        <pre>-- Users see only their own bookings
+CREATE POLICY "Users view own bookings" 
+  ON bookings FOR SELECT 
+  USING (customer_id = auth.uid());
+
+CREATE POLICY "Users create own bookings" 
+  ON bookings FOR INSERT 
+  WITH CHECK (customer_id = auth.uid());</pre>
+      </div>
+      <div class="bg-slate-800 p-5 rounded-lg">
+        <h4 class="font-bold mb-2">📍 Addresses</h4>
+        <pre>-- Users manage only their own addresses
+CREATE POLICY "Users manage own addresses" 
+  ON customer_addresses 
+  FOR ALL 
+  USING (customer_id = auth.uid());</pre>
+      </div>
+      <div class="bg-slate-800 p-5 rounded-lg">
+        <h4 class="font-bold mb-2">🌍 Services (Public Read)</h4>
+        <pre>-- Anyone can browse services
+CREATE POLICY "Services are public" 
+  ON services FOR SELECT 
+  USING (is_active = true);
+
+-- No one writes from client
+-- (admin uses service role key)</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- EDGE FUNCTIONS -->
+<section class="max-w-6xl mx-auto px-6 py-12">
+  <h2 class="text-3xl font-bold mb-6">7. Edge Functions (Deno)</h2>
+  <p class="text-slate-600 mb-6">Server-side logic that can't run in the client.</p>
+  
+  <div class="grid md:grid-cols-3 gap-4">
+    <div class="card p-5">
+      <h4 class="font-bold mb-2 text-pink-700">💳 create-payment-intent</h4>
+      <p class="text-xs text-slate-600 mb-2">Called before opening Stripe sheet</p>
+      <ul class="text-xs space-y-1 text-slate-600">
+        <li>• Get/create Stripe customer</li>
+        <li>• Generate ephemeral key</li>
+        <li>• Create payment intent</li>
+        <li>• Idempotency key handling</li>
+      </ul>
+    </div>
+    <div class="card p-5">
+      <h4 class="font-bold mb-2 text-blue-700">🚗 dispatch-job</h4>
+      <p class="text-xs text-slate-600 mb-2">Triggered after payment success</p>
+      <ul class="text-xs space-y-1 text-slate-600">
+        <li>• Find nearest online partners</li>
+        <li>• Score by rating + distance</li>
+        <li>• Send job offer via FCM</li>
+        <li>• 60s timeout + retry</li>
+      </ul>
+    </div>
+    <div class="card p-5">
+      <h4 class="font-bold mb-2 text-green-700">🔔 send-push</h4>
+      <p class="text-xs text-slate-600 mb-2">Wrapper for FCM</p>
+      <ul class="text-xs space-y-1 text-slate-600">
+        <li>• Look up push tokens</li>
+        <li>• Compose notification</li>
+        <li>• Send via FCM API</li>
+        <li>• Handle invalid tokens</li>
+      </ul>
+    </div>
+    <div class="card p-5">
+      <h4 class="font-bold mb-2 text-purple-700">📅 get-available-slots</h4>
+      <p class="text-xs text-slate-600 mb-2">Returns bookable time slots</p>
+      <ul class="text-xs space-y-1 text-slate-600">
+        <li>• Check partner availability</li>
+        <li>• Filter by service area</li>
+        <li>• Account for travel time</li>
+        <li>• Return 1-hour intervals</li>
+      </ul>
+    </div>
+    <div class="card p-5">
+      <h4 class="font-bold mb-2 text-orange-700">📄 generate-invoice</h4>
+      <p class="text-xs text-slate-600 mb-2">After service complete</p>
+      <ul class="text-xs space-y-1 text-slate-600">
+        <li>• Generate PDF with 19% VAT</li>
+        <li>• Upload to Storage</li>
+        <li>• Email to customer</li>
+        <li>• Save URL in booking</li>
+      </ul>
+    </div>
+    <div class="card p-5">
+      <h4 class="font-bold mb-2 text-red-700">💸 process-refund</h4>
+      <p class="text-xs text-slate-600 mb-2">On cancellation</p>
+      <ul class="text-xs space-y-1 text-slate-600">
+        <li>• Calculate refund amount</li>
+        <li>• Call Stripe refund API</li>
+        <li>• Update booking state</li>
+        <li>• Notify customer + partner</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- FOLDER STRUCTURE -->
+<section class="bg-white py-12">
+  <div class="max-w-6xl mx-auto px-6">
+    <h2 class="text-3xl font-bold mb-6">8. Flutter Project Structure</h2>
+    <pre>lib/
+├── main.dart
+├── bootstrap.dart                    # Supabase init, FCM
+│
+├── core/                             # Cross-cutting concerns
+│   ├── config/                       # Supabase, Stripe keys
+│   ├── theme/                        # Colors, text styles
+│   └── utils/                        # Formatters, validators
+│
+├── data/
+│   ├── models/                       # Customer, Service, Booking...
+│   ├── repositories/                 # Auth, Booking, Payment...
+│   ├── services/                     # Supabase, Stripe, FCM clients
+│   └── remote/                       # Edge function callers
+│
+├── features/
+│   ├── auth/                         # Login, OTP, Onboarding
+│   ├── home/                         # Browse, search
+│   ├── service/                      # Detail, schedule
+│   ├── checkout/                     # Pay, success
+│   ├── tracking/                     # Map, PIN, status
+│   ├── rating/                       # Stars, comments
+│   ├── profile/                      # History, addresses
+│   ├── support/                      # Tickets
+│   └── chat/                         # In-app messaging
+│
+├── shared/
+│   ├── widgets/                      # Reusable UI
+│   └── dialogs/                      # Modals
+│
+└── routes/
+    ├── app_router.dart
+    └── route_paths.dart
+
+supabase/
+├── functions/                        # Edge functions
+│   ├── create-payment-intent/
+│   ├── dispatch-job/
+│   └── send-push/
+└── migrations/                       # SQL files</pre>
+  </div>
+</section>
+
+<!-- COMPARISON -->
+<section class="max-w-6xl mx-auto px-6 py-12">
+  <h2 class="text-3xl font-bold mb-6">9. Customer vs Partner App — Comparison</h2>
+  <div class="card p-6">
+    <table>
+      <thead>
+        <tr>
+          <th>Aspect</th>
+          <th>Customer App</th>
+          <th>Partner App</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><b>Primary Role</b></td>
+          <td>Browser + Payer + Viewer</td>
+          <td>Action-taker + Service executor</td>
+        </tr>
+        <tr>
+          <td><b>State Machine</b></td>
+          <td>Simple (7 states, mostly read)</td>
+          <td>Complex (7+ states, action-driven)</td>
+        </tr>
+        <tr>
+          <td><b>Realtime Usage</b></td>
+          <td>High (tracking, partner location)</td>
+          <td>Medium (job offers, status updates)</td>
+        </tr>
+        <tr>
+          <td><b>Background Services</b></td>
+          <td>Low (FCM only)</td>
+          <td>High (GPS, foreground service)</td>
+        </tr>
+        <tr>
+          <td><b>Payment Role</b></td>
+          <td>Payer (Stripe customer)</td>
+          <td>Recipient (Stripe Connect)</td>
+        </tr>
+        <tr>
+          <td><b>Key Feature</b></td>
+          <td>Live tracking with map</td>
+          <td>Job offer with 60s timer</td>
+        </tr>
+        <tr>
+          <td><b>Permission Focus</b></td>
+          <td>Location (while using), Notifications</td>
+          <td>Background location, Camera, Storage</td>
+        </tr>
+        <tr>
+          <td><b>Critical UX</b></td>
+          <td>Booking completion rate</td>
+          <td>Job acceptance rate</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- COST -->
+<section class="bg-white py-12">
+  <div class="max-w-6xl mx-auto px-6">
+    <h2 class="text-3xl font-bold mb-6">10. Supabase Cost Estimate</h2>
+    <div class="grid md:grid-cols-3 gap-6">
+      <div class="card p-6">
+        <h3 class="font-bold mb-3 text-green-700">🟢 Free Tier</h3>
+        <p class="text-xs text-slate-500 mb-3">For development + early testing</p>
+        <table>
+          <tr><td>Database</td><td class="text-right">500 MB</td></tr>
+          <tr><td>Auth MAU</td><td class="text-right">50K</td></tr>
+          <tr><td>Storage</td><td class="text-right">1 GB</td></tr>
+          <tr><td>Realtime</td><td class="text-right">200 conn</td></tr>
+          <tr><td>Edge Funcs</td><td class="text-right">500K/mo</td></tr>
+          <tr class="font-bold border-t-2"><td>Total</td><td class="text-right text-green-600">€0</td></tr>
+        </table>
+      </div>
+      <div class="card p-6">
+        <h3 class="font-bold mb-3 text-blue-700">🔵 Pilot (100 bookings/day)</h3>
+        <p class="text-xs text-slate-500 mb-3">First 6 months</p>
+        <table>
+          <tr><td>Database (Pro plan)</td><td class="text-right">€25/mo</td></tr>
+          <tr><td>Auth (Pro plan)</td><td class="text-right">included</td></tr>
+          <tr><td>Storage overage</td><td class="text-right">€0.50/mo</td></tr>
+          <tr><td>Realtime overage</td><td class="text-right">€10/mo</td></tr>
+          <tr><td>Edge Function invocations</td><td class="text-right">€10/mo</td></tr>
+          <tr><td>Stripe fees (~€50K/mo)</td><td class="text-right">~€725/mo</td></tr>
+          <tr class="font-bold border-t-2"><td>Total</td><td class="text-right text-blue-600">~€770/mo</td></tr>
+        </table>
+      </div>
+      <div class="card p-6">
+        <h3 class="font-bold mb-3 text-purple-700">🟣 Scale (1000+ bookings/day)</h3>
+        <p class="text-xs text-slate-500 mb-3">Year 1+</p>
+        <table>
+          <tr><td>Database (Team plan)</td><td class="text-right">€100/mo</td></tr>
+          <tr><td>Realtime (Team plan)</td><td class="text-right">€100/mo</td></tr>
+          <tr><td>Storage (100 GB)</td><td class="text-right">€10/mo</td></tr>
+          <tr><td>Edge Functions (10M+)</td><td class="text-right">€50/mo</td></tr>
+          <tr><td>Stripe fees (~€500K/mo)</td><td class="text-right">~€7,250/mo</td></tr>
+          <tr class="font-bold border-t-2"><td>Total</td><td class="text-right text-purple-600">~€7,510/mo</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="gradient-bg text-white py-12">
+  <div class="max-w-4xl mx-auto px-6 text-center">
+    <h2 class="text-3xl font-bold mb-3">Bana lo Architecture. Build it!</h2>
+    <p class="opacity-90 mb-6">Tum Flutter + Supabase mein khud bana loge. Yahan se start karo:</p>
+    <div class="flex flex-wrap justify-center gap-3 mb-6">
+      <span class="bg-white/20 px-4 py-2 rounded-full text-sm">1. supabase init (local dev)</span>
+      <span class="bg-white/20 px-4 py-2 rounded-full text-sm">2. Run migrations (schema)</span>
+      <span class="bg-white/20 px-4 py-2 rounded-full text-sm">3. Setup RLS policies</span>
+      <span class="bg-white/20 px-4 py-2 rounded-full text-sm">4. flutter create + add supabase_flutter</span>
+      <span class="bg-white/20 px-4 py-2 rounded-full text-sm">5. Build screens 1-by-1</span>
+    </div>
+    <p class="text-sm opacity-80">Sab architecture documents ka reference ready hai. Koi specific part mein atak jao toh puchh lena.</p>
+  </div>
+</section>
+
+<script>
+  mermaid.initialize({ 
+    startOnLoad: true, 
+    theme: 'default',
+    flowchart: { useMaxWidth: true, htmlLabels: true },
+    sequence: { useMaxWidth: true }
+  });
+</script>
+
+</body>
+</html>

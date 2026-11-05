@@ -1,0 +1,1416 @@
+<!DOCTYPE html>
+<html lang="hi" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Modern Warfare Chess: 32 vs 32 Tactical Prototype</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --sea-dark: #082f49;
+            --sea-light: #0c4a6e;
+            --land-dark: #1e293b;
+            --land-light: #334155;
+            --gold-tile: #854d0e;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #090d16;
+            color: #f8fafc;
+            overflow-x: hidden;
+            user-select: none;
+        }
+        .font-military {
+            font-family: 'Chakra Petch', sans-serif;
+        }
+        /* 16x16 Grid Styling */
+        .battle-grid {
+            display: grid;
+            grid-template-columns: repeat(16, minmax(0, 1fr));
+            grid-template-rows: repeat(16, minmax(0, 1fr));
+            aspect-ratio: 1 / 1;
+            width: 100%;
+            max-width: min(82vh, 96vw);
+            border: 3px solid #334155;
+            border-radius: 0.75rem;
+            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 25px rgba(56, 189, 248, 0.12);
+            position: relative;
+        }
+        .tile {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 0.5px solid rgba(255, 255, 255, 0.06);
+            cursor: pointer;
+            transition: transform 0.12s ease, background-color 0.15s ease;
+        }
+        .tile:hover {
+            z-index: 10;
+            outline: 2px solid rgba(255, 255, 255, 0.5);
+        }
+        /* Terrains */
+        .terrain-sea-dark {
+            background: linear-gradient(135deg, #082f49 0%, #0369a1 100%);
+        }
+        .terrain-sea-light {
+            background: linear-gradient(135deg, #0c4a6e 0%, #0284c7 100%);
+        }
+        .terrain-land-dark {
+            background-color: #1e293b;
+        }
+        .terrain-land-light {
+            background-color: #293548;
+        }
+        .terrain-gold {
+            background: radial-gradient(circle, #ca8a04 0%, #713f12 100%);
+            box-shadow: inset 0 0 8px #fde047;
+            border: 1px solid #facc15 !important;
+        }
+        /* Move Highlights */
+        .hl-selected {
+            background: rgba(250, 204, 21, 0.45) !important;
+            box-shadow: inset 0 0 0 2px #facc15;
+        }
+        .hl-move {
+            background: rgba(34, 197, 94, 0.42) !important;
+            box-shadow: inset 0 0 0 2px #4ade80;
+        }
+        .hl-move::after {
+            content: '';
+            width: 30%;
+            height: 30%;
+            border-radius: 9999px;
+            background-color: #4ade80;
+            box-shadow: 0 0 8px #22c55e;
+            position: absolute;
+            pointer-events: none;
+        }
+        .hl-capture {
+            background: rgba(239, 68, 68, 0.55) !important;
+            box-shadow: inset 0 0 0 2px #f87171;
+            animation: pulse-red 1.2s infinite;
+        }
+        .hl-ranged {
+            background: rgba(249, 115, 22, 0.6) !important;
+            box-shadow: inset 0 0 0 2px #fb923c;
+            animation: pulse-orange 1s infinite;
+        }
+        .hl-ranged::before {
+            content: '🎯';
+            position: absolute;
+            top: 1px;
+            right: 1px;
+            font-size: 0.6rem;
+            z-index: 20;
+            filter: drop-shadow(0 0 2px #000);
+        }
+        .hl-lastmove {
+            box-shadow: inset 0 0 0 2px rgba(168, 85, 247, 0.85);
+        }
+
+        @keyframes pulse-red {
+            0%, 100% { box-shadow: inset 0 0 0 2px #f87171; }
+            50% { box-shadow: inset 0 0 10px 3px #ef4444; }
+        }
+        @keyframes pulse-orange {
+            0%, 100% { box-shadow: inset 0 0 0 2px #fb923c; }
+            50% { box-shadow: inset 0 0 12px 3px #f97316; }
+        }
+
+        /* Unit Token Styling */
+        .unit-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 92%;
+            height: 92%;
+            border-radius: 0.3rem;
+            position: relative;
+            transition: transform 0.15s ease;
+        }
+        .unit-blue {
+            background: linear-gradient(180deg, rgba(37, 99, 235, 0.9) 0%, rgba(29, 78, 216, 0.95) 100%);
+            border: 1.5px solid #93c5fd;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+        .unit-red {
+            background: linear-gradient(180deg, rgba(220, 38, 38, 0.9) 0%, rgba(185, 28, 28, 0.95) 100%);
+            border: 1.5px solid #fca5a5;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+        .unit-emoji {
+            font-size: clamp(0.65rem, 1.8vmin, 1.25rem);
+            line-height: 1;
+            filter: drop-shadow(0 1px 1px rgba(0,0,0,0.6));
+        }
+        .unit-code {
+            font-size: clamp(0.42rem, 0.95vmin, 0.65rem);
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            line-height: 1;
+            margin-top: 1px;
+            color: #ffffff;
+            text-shadow: 0 1px 2px #000;
+        }
+        /* Explosion effect */
+        .explosion-fx {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            z-index: 40;
+            pointer-events: none;
+            animation: boom 0.55s ease-out forwards;
+        }
+        @keyframes boom {
+            0% { transform: scale(0.3); opacity: 1; }
+            60% { transform: scale(1.5); opacity: 1; }
+            100% { transform: scale(2); opacity: 0; }
+        }
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-950 text-slate-100">
+
+    <!-- Top Tactical Navbar -->
+    <header class="w-full bg-slate-900/90 border-b border-slate-800 px-3 py-2 sticky top-0 z-30 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-800 flex items-center justify-center text-xl shadow-md border border-blue-400/30">
+                    🎖️
+                </div>
+                <div>
+                    <h1 class="font-military font-bold text-base sm:text-lg tracking-wider text-white flex items-center gap-2">
+                        MODERN WARFARE CHESS <span class="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">32 vs 32</span>
+                    </h1>
+                    <p class="text-[11px] text-slate-400 hidden sm:block">16x16 Tactical Grid • Sea, Land & Air Combat • Ranged Strikes</p>
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                <button id="btnModeToggle" onclick="toggleGameMode()" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-400/40 transition flex items-center gap-1.5 shadow">
+                    <span>🤖</span> <span id="modeLabel">Mode: vs AI Bot</span>
+                </button>
+                <button onclick="openRulesModal()" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-600 hover:bg-amber-500 text-white border border-amber-400/40 transition flex items-center gap-1 shadow">
+                    <span>📖</span> <span>Niyam (Rules)</span>
+                </button>
+                <button id="btnSound" onclick="toggleSound()" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
+                    🔊 Sound: ON
+                </button>
+                <button onclick="resetGame()" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-rose-700 hover:bg-rose-600 text-white border border-rose-500/40 transition">
+                    🔄 Restart
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Layout -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-2 sm:p-4 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+
+        <!-- Left Column: Live Status, Legend & Selected Piece Guide (4 cols on desktop) -->
+        <section class="lg:col-span-4 flex flex-col gap-3 order-2 lg:order-1">
+            
+            <!-- Turn & Scoreboard Card -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-3.5 shadow-lg">
+                <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+                    <span class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Current Command Turn</span>
+                    <span id="turnBadge" class="px-3 py-1 rounded-full text-xs font-bold bg-blue-600 text-white shadow-sm flex items-center gap-1.5">
+                        🔵 BLUE COALITION KI CHAAL
+                    </span>
+                </div>
+
+                <!-- 2 Teams Status -->
+                <div class="grid grid-cols-2 gap-2.5 text-xs">
+                    <!-- Blue Stats -->
+                    <div class="bg-blue-950/40 border border-blue-800/60 rounded-lg p-2.5">
+                        <div class="font-bold text-blue-300 flex items-center justify-between">
+                            <span>🔵 BLUE (P1)</span>
+                            <span id="blueUnitsCount" class="text-white font-mono">32/32</span>
+                        </div>
+                        <div class="mt-1.5 flex items-center justify-between text-[11px] text-slate-300">
+                            <span>💰 Gold Vaults:</span>
+                            <span id="blueGoldCount" class="font-bold text-amber-400">2/2 (Full Fuel)</span>
+                        </div>
+                        <div class="mt-1 flex items-center justify-between text-[11px] text-slate-300">
+                            <span>⛏️ Gold Mines:</span>
+                            <span id="blueMinesCount" class="font-bold text-yellow-300">0</span>
+                        </div>
+                    </div>
+
+                    <!-- Red Stats -->
+                    <div class="bg-rose-950/40 border border-rose-800/60 rounded-lg p-2.5">
+                        <div class="font-bold text-rose-300 flex items-center justify-between">
+                            <span>🔴 RED (P2/AI)</span>
+                            <span id="redUnitsCount" class="text-white font-mono">32/32</span>
+                        </div>
+                        <div class="mt-1.5 flex items-center justify-between text-[11px] text-slate-300">
+                            <span>💰 Gold Vaults:</span>
+                            <span id="redGoldCount" class="font-bold text-amber-400">2/2 (Full Fuel)</span>
+                        </div>
+                        <div class="mt-1 flex items-center justify-between text-[11px] text-slate-300">
+                            <span>⛏️ Gold Mines:</span>
+                            <span id="redMinesCount" class="font-bold text-yellow-300">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Color Highlight Legend (Visual Onboarding) -->
+                <div class="mt-3 pt-2.5 border-t border-slate-800/80 grid grid-cols-3 gap-1.5 text-[11px]">
+                    <div class="flex items-center gap-1.5 bg-slate-950/70 px-2 py-1.5 rounded border border-emerald-500/30">
+                        <span class="w-3 h-3 rounded-full bg-emerald-500 inline-block shrink-0"></span>
+                        <span class="text-emerald-300 font-medium leading-tight">Chaal (Move)</span>
+                    </div>
+                    <div class="flex items-center gap-1.5 bg-slate-950/70 px-2 py-1.5 rounded border border-rose-500/30">
+                        <span class="w-3 h-3 rounded-full bg-rose-500 inline-block shrink-0"></span>
+                        <span class="text-rose-300 font-medium leading-tight">Kabza (Melee)</span>
+                    </div>
+                    <div class="flex items-center gap-1.5 bg-slate-950/70 px-2 py-1.5 rounded border border-orange-500/30">
+                        <span class="w-3 h-3 rounded-full bg-orange-500 inline-block shrink-0"></span>
+                        <span class="text-orange-300 font-medium leading-tight">🎯 Ranged Shoot</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Interactive Unit Inspector (Hinglish Guide) -->
+            <div id="unitInspector" class="bg-slate-900 border border-slate-700 rounded-xl p-4 shadow-lg relative overflow-hidden">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2.5 mb-2.5">
+                    <div class="flex items-center gap-2.5">
+                        <div id="inspEmoji" class="w-11 h-11 rounded-xl bg-slate-800 border border-slate-600 flex items-center justify-center text-2xl shadow-inner">
+                            🎖️
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-1.5">
+                                <h2 id="inspTitle" class="font-military font-bold text-base text-white">Kisi Bhi Unit Par Click Karein</h2>
+                                <span id="inspBadge" class="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">INFO</span>
+                            </div>
+                            <p id="inspRole" class="text-xs text-amber-400 font-medium">Chaal aur ताकत (Power) dekhne ke liye mohra chunein</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-2 text-xs">
+                    <div class="bg-slate-950/70 p-2.5 rounded-lg border border-slate-800">
+                        <span class="text-slate-400 font-semibold block mb-0.5">🗺️ Kahan Chal Sakta Hai (Terrain):</span>
+                        <p id="inspTerrain" class="text-slate-200 font-medium">Board ke kisi bhi mohre par click ya hover karein.</p>
+                    </div>
+                    <div class="bg-slate-950/70 p-2.5 rounded-lg border border-slate-800">
+                        <span class="text-emerald-400 font-semibold block mb-0.5">🟢 Chaal Ka Niyam (Movement):</span>
+                        <p id="inspMove" class="text-slate-200">Jab aap apna mohra select karenge, green boxes dikhayenge ki wo kahan ja sakta hai.</p>
+                    </div>
+                    <div class="bg-slate-950/70 p-2.5 rounded-lg border border-slate-800">
+                        <span class="text-orange-400 font-semibold block mb-0.5">🔥 Khaas Taakat (Special Power):</span>
+                        <p id="inspSpecial" class="text-slate-200">Artillery (ART), Submarine (SUB), aur Air Defense (SAM) bina apni jagah chhode door se dushman ko shoot (🎯 Orange Box) kar sakte hain!</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Reference Catalog of All 11 Units -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-3.5 shadow-lg">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="font-military font-bold text-xs uppercase tracking-wider text-slate-300">📋 11 Units Quick Reference (Click to Inspect)</h3>
+                    <span class="text-[10px] text-slate-400">Total 32/Player</span>
+                </div>
+                <div id="unitCatalogGrid" class="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-3 gap-1.5 text-[11px]">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- Combat Log -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-lg">
+                <div class="flex items-center justify-between mb-1.5">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-400">📡 Live Battle Radar Log</span>
+                    <span id="turnCounter" class="text-[11px] font-mono text-slate-400">Turn #1</span>
+                </div>
+                <div id="battleLog" class="h-24 overflow-y-auto text-xs space-y-1 bg-slate-950 p-2 rounded-lg border border-slate-800/80 font-mono">
+                    <div class="text-emerald-400">» Battle initialized! Blue Coalition moves first.</div>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- Right Column: 16x16 Tactical Board (8 cols on desktop) -->
+        <section class="lg:col-span-8 flex flex-col items-center justify-center order-1 lg:order-2">
+            
+            <!-- Top Terrain Strip Indicator -->
+            <div class="w-full max-w-[min(82vh,96vw)] flex items-center justify-between text-[10px] sm:text-xs font-semibold mb-1 px-1 text-slate-300">
+                <span class="px-2 py-0.5 rounded bg-sky-950 text-sky-300 border border-sky-700/50">🌊 Col 0-1: Sea Lane</span>
+                <span class="px-2 py-0.5 rounded bg-slate-800 text-amber-300 border border-slate-600">🪖 Col 2-13: Main Land Grid & Center Gold Mines</span>
+                <span class="px-2 py-0.5 rounded bg-sky-950 text-sky-300 border border-sky-700/50">🌊 Col 14-15: Sea Lane</span>
+            </div>
+
+            <!-- 16x16 Board Container -->
+            <div id="boardGrid" class="battle-grid">
+                <!-- 256 Tiles Rendered Dynamically -->
+            </div>
+
+            <!-- Bottom Helper Bar -->
+            <div class="w-full max-w-[min(82vh,96vw)] mt-2 flex flex-wrap items-center justify-between gap-2 text-xs bg-slate-900/90 border border-slate-800 px-3 py-2 rounded-lg">
+                <div class="flex items-center gap-2">
+                    <span class="text-amber-400 font-bold">💡 Pro Tip:</span>
+                    <span id="proTipText" class="text-slate-300">Submarine (🚤 SUB) aur Artillery (🎯 ART) bina chale 3 kadam door tak 🎯 Orange Strike kar sakte hain!</span>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Promotion Modal (For Infantry reaching last row) -->
+    <div id="promoModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-slate-900 border-2 border-amber-500 rounded-2xl max-w-md w-full p-5 shadow-2xl text-center">
+            <div class="text-3xl mb-2">🎖️</div>
+            <h3 class="font-military text-xl font-bold text-white">SAINIK PROMOTION!</h3>
+            <p class="text-xs text-slate-300 mt-1 mb-4">Aapka Infantry (🪖 INF) dushman ke base tak pahunch gaya hai! Ise kis heavy unit mein upgrade karna chahenge?</p>
+            <div class="grid grid-cols-3 gap-2.5">
+                <button onclick="completePromotion('BMB')" class="p-3 rounded-xl bg-slate-800 hover:bg-indigo-600 border border-slate-600 transition flex flex-col items-center">
+                    <span class="text-2xl">🛸</span>
+                    <span class="font-bold text-xs mt-1">Bomber (BMB)</span>
+                    <span class="text-[10px] text-slate-300">Queen Power</span>
+                </button>
+                <button onclick="completePromotion('JET')" class="p-3 rounded-xl bg-slate-800 hover:bg-indigo-600 border border-slate-600 transition flex flex-col items-center">
+                    <span class="text-2xl">✈️</span>
+                    <span class="font-bold text-xs mt-1">Stealth Jet (JET)</span>
+                    <span class="text-[10px] text-slate-300">4-Tile Air Jump</span>
+                </button>
+                <button onclick="completePromotion('TNK')" class="p-3 rounded-xl bg-slate-800 hover:bg-indigo-600 border border-slate-600 transition flex flex-col items-center">
+                    <span class="text-2xl">🛡️</span>
+                    <span class="font-bold text-xs mt-1">Heavy Tank (TNK)</span>
+                    <span class="text-[10px] text-slate-300">6-Tile Rook</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Victory / Game Over Modal -->
+    <div id="victoryModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 hidden items-center justify-center p-4">
+        <div class="bg-slate-900 border-2 border-emerald-500 rounded-2xl max-w-md w-full p-6 shadow-2xl text-center">
+            <div id="vicIcon" class="text-5xl mb-3">🏆</div>
+            <h2 id="vicTitle" class="font-military text-2xl font-bold text-white">BLUE COALITION WINS!</h2>
+            <p id="vicReason" class="text-sm text-slate-300 mt-2 mb-6">Dushman ka Command Bunker (HQ) tabah kar diya gaya!</p>
+            <button onclick="closeVictoryAndRestart()" class="w-full py-3 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg transition">
+                🔄 Naya Match Khelein (Play Again)
+            </button>
+        </div>
+    </div>
+
+    <!-- Rules & Onboarding Modal (Hinglish) -->
+    <div id="rulesModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-3 sm:p-6">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            <div class="px-5 py-4 bg-slate-800/80 border-b border-slate-700 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">📖</span>
+                    <h2 class="font-military text-lg font-bold text-white">MODERN WARFARE CHESS: RULES & GUIDE (HINGLISH)</h2>
+                </div>
+                <button onclick="closeRulesModal()" class="w-8 h-8 rounded-lg bg-slate-700 hover:bg-rose-600 text-white font-bold">✕</button>
+            </div>
+
+            <div class="p-5 overflow-y-auto space-y-4 text-xs sm:text-sm text-slate-200 leading-relaxed">
+                <div class="bg-indigo-950/50 border border-indigo-500/40 rounded-xl p-3.5">
+                    <h3 class="font-bold text-indigo-300 text-sm mb-1">🎯 Khel Ka Maksad (How to Win):</h3>
+                    <p>Har khiladi ke paas <strong>32 Modern Military Units</strong> hain. Jeetne ka sabse seedha tarika hai dushman ke <strong>🏛️ Command Bunker (HQ)</strong> ko tabah karna! Agar aap dushman ke dono <strong>💰 Gold Vaults (GLD)</strong> tod dete hain, toh dushman ki heavy machines (Tank, Jet, Bomber, Submarine) ka fuel khatam ho jata hai aur wo sirf 1 kadam chal paati hain!</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div class="bg-slate-950 p-3 rounded-xl border border-emerald-500/30">
+                        <div class="font-bold text-emerald-400 mb-1">🟢 Green Box = Normal Move</div>
+                        <p class="text-xs text-slate-300">Khali zameen ya samundar mein apni unit ko aage badhane ke liye Green box par click karein.</p>
+                    </div>
+                    <div class="bg-slate-950 p-3 rounded-xl border border-rose-500/30">
+                        <div class="font-bold text-rose-400 mb-1">🔴 Red Box = Melee Capture</div>
+                        <p class="text-xs text-slate-300">Purane chess ki tarah dushman ke khane mein ja kar usey tabah karne ke liye Red box dabayein.</p>
+                    </div>
+                    <div class="bg-slate-950 p-3 rounded-xl border border-orange-500/30">
+                        <div class="font-bold text-orange-400 mb-1">🟠 🎯 Orange Box = Ranged Strike!</div>
+                        <p class="text-xs text-slate-300"><strong>Naya Rule:</strong> Artillery (🎯), Submarine (🚤) aur Air Defense (🚀) bina apni jagah se hile door se missile maar kar dushman ko uda sakte hain!</p>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="font-bold text-amber-400 text-sm mb-2">🗺️ 3 Tarah Ke Ilake (16x16 Battlefield Terrains):</h3>
+                    <ul class="list-disc list-inside space-y-1 text-xs text-slate-300">
+                        <li><strong class="text-sky-400">🌊 Sea Lanes (Kinare ke 2-2 Columns):</strong> Yahan sirf <strong>Submarine (🚤)</strong>, <strong>Commando (🥷)</strong> aur udne wale <strong>Air Units (✈️, 🚁, 🛸)</strong> ruk sakte hain. Tank ya Sainik paani mein nahi ja sakte.</li>
+                        <li><strong class="text-slate-200">🪖 Land Grid (Beech ke 12 Columns):</strong> Yahan Tank, Artillery, Sainik, Gold Vault aur HQ chalte hain.</li>
+                        <li><strong class="text-yellow-400">⛏️ Center Gold Mines (Beech ke 4 Sone ke Khane):</strong> Apni units ko yahan rakhne par aapka Economic Control badhta hai.</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h3 class="font-bold text-white text-sm mb-2">⚔️ Saare 11 Mohron Ki Chaal (32 Pieces per Team):</h3>
+                    <div id="rulesUnitTable" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="px-5 py-3 bg-slate-800/80 border-t border-slate-700 flex justify-end">
+                <button onclick="closeRulesModal()" class="px-5 py-2 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm">
+                    👍 Samajh Gaya, Battle Shuru Karein!
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**************************************************************
+         * 1. UNIT DEFINITIONS & HINGLISH ONBOARDING DATA
+         **************************************************************/
+        const UNIT_TYPES = {
+            HQ: {
+                code: 'HQ',
+                name: 'Command Bunker (Raja)',
+                emoji: '🏛️',
+                count: 1,
+                domain: 'LAND', // Can only stand on Land
+                role: 'Supreme Commander (King)',
+                terrainText: 'Sirf Zameen (Land Grid Col 2-13) par chal sakta hai.',
+                moveText: 'Apne aas-paas kisi bhi disha mein 1 kadam (King move).',
+                specialText: '⚠️ Sabse zaroori! Agar HQ tabah hua toh turant GAME OVER!',
+                value: 1000
+            },
+            GLD: {
+                code: 'GLD',
+                name: 'Gold Vault (Supply Truck)',
+                emoji: '💰',
+                count: 2,
+                domain: 'LAND',
+                role: 'Fuel & Economy Reserve',
+                terrainText: 'Sirf Zameen (Land) par.',
+                moveText: 'Seedha (Up, Down, Left, Right) 1 kadam.',
+                specialText: '⚡ Agar aapke dono Gold Vaults tabah ho gaye, toh Tank, Jet, Bomber aur Submarine ka fuel khatam ho jayega (sirf 1 kadam chal payenge)!',
+                value: 95
+            },
+            BMB: {
+                code: 'BMB',
+                name: 'Strategic Bomber (Wazir)',
+                emoji: '🛸',
+                count: 1,
+                domain: 'AIR', // Can move over Land & Sea
+                role: 'Heavy Air Dominance (Queen)',
+                terrainText: 'Zameen aur Samundar dono ke upar ud sakta hai (All 16x16).',
+                moveText: 'Rani (Queen) ki tarah seedha ya tircha (Diagonal) kitne bhi kadam!',
+                specialText: 'Sabse khatarnak long-range strike aircraft. Isey Air Defense (SAM) se bacha kar rakhein!',
+                value: 140
+            },
+            JET: {
+                code: 'JET',
+                name: 'Stealth Fighter Jet',
+                emoji: '✈️',
+                count: 2,
+                domain: 'AIR',
+                role: 'High-Speed Jump Interceptor',
+                terrainText: 'Zameen aur Samundar dono par (All 16x16).',
+                moveText: 'Seedha ya tircha 4 kadam tak UDKAR (Jump) ja sakta hai (beech ke mohron ke upar se kood jata hai).',
+                specialText: '🛡️ Stealth Armor: Sadharan Sainik (🪖 INF) is Fighter Jet par hamla nahi kar sakte!',
+                value: 85
+            },
+            TNK: {
+                code: 'TNK',
+                name: 'Heavy Battle Tank (Hathi)',
+                emoji: '🛡️',
+                count: 3,
+                domain: 'LAND',
+                role: 'Armored Frontline Breaker (Rook)',
+                terrainText: 'Sirf Zameen (Land Col 2-13) par. Paani mein nahi ja sakta.',
+                moveText: 'Hathi (Rook) ki tarah seedha (Up, Down, Left, Right) 6 kadam tak.',
+                specialText: 'Zameen par seedhi line mein dushman ki fauj ko kuchalne ke liye best.',
+                value: 75
+            },
+            CHP: {
+                code: 'CHP',
+                name: 'Apache Attack Chopper (Ghoda)',
+                emoji: '🚁',
+                count: 3,
+                domain: 'AIR',
+                role: 'Tactical Jump Helicopter (Knight+)',
+                terrainText: 'Zameen aur Samundar dono par (All 16x16).',
+                moveText: 'Ghode ki tarah L-Shape (2x1 ya 3x1) mein koodta hai, ya 2 kadam tircha (Diagonal) jump karta hai.',
+                specialText: 'Kisi bhi unit ke upar se kood kar dushman ke peeche ghus sakta hai.',
+                value: 60
+            },
+            ART: {
+                code: 'ART',
+                name: 'Artillery / Sniper (Oont)',
+                emoji: '🎯',
+                count: 3,
+                domain: 'LAND',
+                role: 'Long-Range Bombardment (Bishop+)',
+                terrainText: 'Sirf Zameen (Land) par chalta hai.',
+                moveText: 'Oont (Bishop) ki tarah tircha (Diagonal) 3 kadam chalta hai.',
+                specialText: '🟠 RANGED STRIKE: Bina apni jagah se hile, 3 kadam door (Seedha ya Tircha) kisi bhi dushman par toap daag kar usey uda sakta hai!',
+                value: 70
+            },
+            SUB: {
+                code: 'SUB',
+                name: 'Nuclear Submarine',
+                emoji: '🚤',
+                count: 2,
+                domain: 'SEA', // Only in Sea cols 0,1,14,15
+                role: 'Stealth Naval Missile Platform',
+                terrainText: '🌊 SIRF SEA LANES (Col 0, 1 aur Col 14, 15) ke neele paani mein.',
+                moveText: 'Paani ke andar 5 kadam tak seedha ya tircha chal sakti hai.',
+                specialText: '🟠 CRUISE MISSILE: Paani ke andar baithe-baithe 3 kadam ke ghere (Radius) mein Zameen ya Paani par kisi bhi dushman ko missile se uda sakti hai!',
+                value: 75
+            },
+            SAM: {
+                code: 'SAM',
+                name: 'S-400 Air Defense System',
+                emoji: '🚀',
+                count: 2,
+                domain: 'LAND',
+                role: 'Anti-Aircraft Missile Battery',
+                terrainText: 'Sirf Zameen (Land) par.',
+                moveText: 'Kisi bhi disha mein 1 kadam.',
+                specialText: '🟠 ANTI-AIR RADAR: Bina chale 3 kadam ke ghere mein kisi bhi Air Unit (✈️ JET, 🛸 BMB, 🚁 CHP) ko hawa mein hi shoot kar sakta hai (aur 2 kadam tak zameeni unit ko)!',
+                value: 65
+            },
+            CMD: {
+                code: 'CMD',
+                name: 'Navy SEAL Commando',
+                emoji: '🥷',
+                count: 3,
+                domain: 'AMPHIBIOUS', // Land + Sea
+                role: 'Special Forces Infiltrator',
+                terrainText: 'Amphibious: Zameen aur Samundar (Paani) dono mein chal sakta hai!',
+                moveText: 'Kisi bhi disha mein 2 kadam chal sakta hai aur 1 mohre ke upar se kood (Jump) bhi sakta hai.',
+                specialText: 'Samundar ke raste dushman ke base mein ghus kar Gold ya HQ udane mein mahir.',
+                value: 55
+            },
+            INF: {
+                code: 'INF',
+                name: 'Infantry / Sainik (Pyada)',
+                emoji: '🪖',
+                count: 10,
+                domain: 'LAND',
+                role: 'Frontline Ground Soldier',
+                terrainText: 'Sirf Zameen (Land) par.',
+                moveText: '1 kadam aage badhta hai (Pehli chaal mein 2 kadam). Dushman ko 1 kadam Aage-Tircha (Diagonal) ya Seedha Aage maarta hai.',
+                specialText: '🎖️ PROMOTION: Dushman ki aakhri line par pahunchte hi Bomber (🛸), Jet (✈️) ya Tank (🛡️) ban jata hai! (Note: Ye Jet ko nahi maar sakta).',
+                value: 20
+            }
+        };
+
+        const PRO_TIPS = [
+            "Submarine (🚤 SUB) aur Artillery (🎯 ART) bina chale 3 kadam door tak 🎯 Orange Strike kar sakte hain!",
+            "Sainik (🪖 INF) kabhi bhi Stealth Fighter Jet (✈️ JET) ko nahi kaat sakta — Jet ke liye SAM (🚀) ya apna Jet lagayein!",
+            "Agar aap dushman ke dono 💰 Gold Vaults tod denge, toh uske Tank, Jet aur Bomber sirf 1 kadam chal payenge!",
+            "Navy SEAL Commando (🥷 CMD) paani aur zameen dono par chal sakta hai aur 1 unit ke upar kood sakta hai!",
+            "S-400 Air Defense (🚀 SAM) apne aas-paas 3 kadam ke andar kisi bhi Helicopter, Jet ya Bomber ko shoot kar deta hai!"
+        ];
+
+        /**************************************************************
+         * 2. SOUND SYNTHESIZER (WEB AUDIO API)
+         **************************************************************/
+        let soundEnabled = true;
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (AudioContext) audioCtx = new AudioContext();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playSound(type) {
+            if (!soundEnabled) return;
+            try {
+                initAudio();
+                if (!audioCtx) return;
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                if (type === 'select') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(520, now);
+                    osc.frequency.exponentialRampToValueAtTime(680, now + 0.06);
+                    gain.gain.setValueAtTime(0.08, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+                    osc.start(now);
+                    osc.stop(now + 0.06);
+                } else if (type === 'move') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.exponentialRampToValueAtTime(440, now + 0.09);
+                    gain.gain.setValueAtTime(0.12, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+                    osc.start(now);
+                    osc.stop(now + 0.09);
+                } else if (type === 'capture') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(180, now);
+                    osc.frequency.exponentialRampToValueAtTime(55, now + 0.22);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+                    osc.start(now);
+                    osc.stop(now + 0.22);
+                } else if (type === 'ranged') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(780, now);
+                    osc.frequency.exponentialRampToValueAtTime(110, now + 0.28);
+                    gain.gain.setValueAtTime(0.18, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+                    osc.start(now);
+                    osc.stop(now + 0.28);
+                } else if (type === 'win') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(440, now);
+                    osc.frequency.setValueAtTime(554, now + 0.12);
+                    osc.frequency.setValueAtTime(659, now + 0.24);
+                    osc.frequency.setValueAtTime(880, now + 0.36);
+                    gain.gain.setValueAtTime(0.18, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+                    osc.start(now);
+                    osc.stop(now + 0.6);
+                }
+            } catch (e) {
+                // Ignore audio error
+            }
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            document.getElementById('btnSound').innerText = soundEnabled ? '🔊 Sound: ON' : '🔇 Sound: OFF';
+        }
+
+        /**************************************************************
+         * 3. BOARD & STATE MANAGEMENT (16x16, 32 vs 32)
+         **************************************************************/
+        const BOARD_SIZE = 16;
+        let board = []; // 16x16 array of null or { type, team: 'BLUE'|'RED', moved: bool }
+        let currentTurn = 'BLUE';
+        let selectedTile = null; // { r, c }
+        let validActions = []; // Array of { r, c, actionType: 'MOVE' | 'CAPTURE' | 'RANGED' }
+        let lastMove = null; // { fromR, fromC, toR, toC }
+        let vsAI = true;
+        let gameOver = false;
+        let turnNumber = 1;
+        let pendingPromotion = null; // { r, c, team }
+
+        function isSeaTile(r, c) {
+            return c <= 1 || c >= 14;
+        }
+
+        function isGoldMineTile(r, c) {
+            return (r === 7 || r === 8) && (c === 7 || c === 8);
+        }
+
+        function canUnitStandOn(unitCode, r, c) {
+            const domain = UNIT_TYPES[unitCode].domain;
+            const sea = isSeaTile(r, c);
+            if (domain === 'LAND') return !sea;
+            if (domain === 'SEA') return sea;
+            // AIR and AMPHIBIOUS can stand on both Land and Sea
+            return true;
+        }
+
+        function createInitialFormation() {
+            board = Array.from({ length: BOARD_SIZE }, () => Array(BOARD_SIZE).fill(null));
+
+            // Exact 32-piece layout per player respecting Sea (Cols 0,1,14,15) and Land (Cols 2..13)
+            const backRow = [
+                'SUB', 'JET', 'TNK', 'ART', 'SAM', 'CHP', 'GLD', 'HQ',
+                'BMB', 'GLD', 'CHP', 'SAM', 'ART', 'TNK', 'JET', 'SUB'
+            ];
+            const frontRow = [
+                'CHP', 'CMD', 'TNK', 'INF', 'INF', 'INF', 'INF', 'INF',
+                'INF', 'INF', 'INF', 'INF', 'INF', 'ART', 'CMD', 'CMD'
+            ];
+
+            // Place RED Syndicate at top (Row 0 = backRow, Row 1 = frontRow)
+            for (let c = 0; c < BOARD_SIZE; c++) {
+                board[0][c] = { type: backRow[c], team: 'RED', moved: false };
+                board[1][c] = { type: frontRow[c], team: 'RED', moved: false };
+            }
+
+            // Place BLUE Coalition at bottom (Row 15 = backRow, Row 14 = frontRow)
+            for (let c = 0; c < BOARD_SIZE; c++) {
+                board[15][c] = { type: backRow[c], team: 'BLUE', moved: false };
+                board[14][c] = { type: frontRow[c], team: 'BLUE', moved: false };
+            }
+        }
+
+        function isTeamFuelCrippled(team) {
+            let goldCount = 0;
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    const p = board[r][c];
+                    if (p && p.team === team && p.type === 'GLD') goldCount++;
+                }
+            }
+            return goldCount === 0;
+        }
+
+        function canAttackerHurtTarget(attackerType, targetType) {
+            // Special Stealth Rule: Infantry (INF) cannot attack Stealth Fighter Jet (JET)
+            if (attackerType === 'INF' && targetType === 'JET') {
+                return false;
+            }
+            return true;
+        }
+
+        /**************************************************************
+         * 4. MOVEMENT & RANGED STRIKE ENGINE
+         **************************************************************/
+        function inBounds(r, c) {
+            return r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE;
+        }
+
+        function getValidActionsForUnit(r, c) {
+            const unit = board[r][c];
+            if (!unit) return [];
+            const actions = [];
+            const type = unit.type;
+            const team = unit.team;
+            const crippled = isTeamFuelCrippled(team);
+            const heavyUnits = ['BMB', 'JET', 'TNK', 'SUB'];
+            const fuelPenalty = crippled && heavyUnits.includes(type);
+
+            const dirsOrtho = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+            const dirsDiag = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
+            const dirsAll = [...dirsOrtho, ...dirsDiag];
+
+            // Helper to add sliding moves (Rook/Bishop/Queen style)
+            function addRayMoves(dirs, maxDist, canJump = false) {
+                const limit = fuelPenalty ? 1 : maxDist;
+                for (const [dr, dc] of dirs) {
+                    for (let step = 1; step <= limit; step++) {
+                        const nr = r + dr * step;
+                        const nc = c + dc * step;
+                        if (!inBounds(nr, nc)) break;
+
+                        const destTerrainOk = canUnitStandOn(type, nr, nc);
+                        const occupant = board[nr][nc];
+
+                        if (!occupant) {
+                            if (destTerrainOk) {
+                                actions.push({ r: nr, c: nc, actionType: 'MOVE' });
+                            } else if (!canJump && UNIT_TYPES[type].domain !== 'AIR') {
+                                // Land/Sea bound unit blocked by incompatible terrain
+                                break;
+                            }
+                        } else {
+                            if (occupant.team !== team && destTerrainOk && canAttackerHurtTarget(type, occupant.type)) {
+                                actions.push({ r: nr, c: nc, actionType: 'CAPTURE' });
+                            }
+                            if (!canJump) break; // Blocked by piece unless jumping unit
+                        }
+                    }
+                }
+            }
+
+            switch (type) {
+                case 'HQ':
+                    addRayMoves(dirsAll, 1, false);
+                    break;
+
+                case 'GLD':
+                    addRayMoves(dirsOrtho, 1, false);
+                    break;
+
+                case 'BMB':
+                    addRayMoves(dirsAll, 15, false);
+                    break;
+
+                case 'JET':
+                    // Jumps up to 4 tiles in any straight or diagonal line
+                    addRayMoves(dirsAll, 4, true);
+                    break;
+
+                case 'TNK':
+                    addRayMoves(dirsOrtho, 6, false);
+                    break;
+
+                case 'CHP': {
+                    // Extended Knight L-jumps (2x1 and 3x1) + 2-step diagonal jump
+                    const offsets = [
+                        [-2, -1], [-2, 1], [2, -1], [2, 1],
+                        [-1, -2], [-1, 2], [1, -2], [1, 2],
+                        [-3, -1], [-3, 1], [3, -1], [3, 1],
+                        [-1, -3], [-1, 3], [1, -3], [1, 3],
+                        [-2, -2], [-2, 2], [2, -2], [2, 2],
+                        [-1, 0], [1, 0], [0, -1], [0, 1]
+                    ];
+                    for (const [dr, dc] of offsets) {
+                        const nr = r + dr;
+                        const nc = c + dc;
+                        if (!inBounds(nr, nc)) continue;
+                        if (!canUnitStandOn(type, nr, nc)) continue;
+                        const occ = board[nr][nc];
+                        if (!occ) {
+                            actions.push({ r: nr, c: nc, actionType: 'MOVE' });
+                        } else if (occ.team !== team && canAttackerHurtTarget(type, occ.type)) {
+                            actions.push({ r: nr, c: nc, actionType: 'CAPTURE' });
+                        }
+                    }
+                    break;
+                }
+
+                case 'ART': {
+                    // Moves up to 3 tiles diagonally on Land
+                    addRayMoves(dirsDiag, 3, false);
+                    // Special: RANGED STRIKE up to 3 tiles in 8 directions (destroys enemy without moving)
+                    for (const [dr, dc] of dirsAll) {
+                        for (let step = 1; step <= 3; step++) {
+                            const nr = r + dr * step;
+                            const nc = c + dc * step;
+                            if (!inBounds(nr, nc)) break;
+                            const occ = board[nr][nc];
+                            if (occ && occ.team !== team) {
+                                actions.push({ r: nr, c: nc, actionType: 'RANGED' });
+                            }
+                        }
+                    }
+                    break;
+                }
+
+                case 'SUB': {
+                    // Moves up to 5 tiles inside Sea Lanes
+                    addRayMoves(dirsAll, 5, false);
+                    // Special: RANGED CRUISE MISSILE within 3 tiles radius (Chebyshev distance <= 3)
+                    const rangeLimit = fuelPenalty ? 1 : 3;
+                    for (let dr = -rangeLimit; dr <= rangeLimit; dr++) {
+                        for (let dc = -rangeLimit; dc <= rangeLimit; dc++) {
+                            if (dr === 0 && dc === 0) continue;
+                            const nr = r + dr;
+                            const nc = c + dc;
+                            if (!inBounds(nr, nc)) continue;
+                            const occ = board[nr][nc];
+                            if (occ && occ.team !== team) {
+                                // Avoid duplicate if already in CAPTURE on sea
+                                const already = actions.some(a => a.r === nr && a.c === nc);
+                                if (!already) {
+                                    actions.push({ r: nr, c: nc, actionType: 'RANGED' });
+                                }
+                            }
+                        }
+                    }
+                    break;
+                }
+
+                case 'SAM': {
+                    // Moves 1 step on land
+                    addRayMoves(dirsAll, 1, false);
+                    // Special: Anti-Air Ranged Strike (3-tile radius vs AIR units, 2-tile radius vs non-air)
+                    for (let dr = -3; dr <= 3; dr++) {
+                        for (let dc = -3; dc <= 3; dc++) {
+                            if (dr === 0 && dc === 0) continue;
+                            const nr = r + dr;
+                            const nc = c + dc;
+                            if (!inBounds(nr, nc)) continue;
+                            const occ = board[nr][nc];
+                            if (occ && occ.team !== team) {
+                                const dist = Math.max(Math.abs(dr), Math.abs(dc));
+                                const isAirTarget = UNIT_TYPES[occ.type].domain === 'AIR';
+                                if ((isAirTarget && dist <= 3) || (!isAirTarget && dist <= 2)) {
+                                    const already = actions.some(a => a.r === nr && a.c === nc);
+                                    if (!already) {
+                                        actions.push({ r: nr, c: nc, actionType: 'RANGED' });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    break;
+                }
+
+                case 'CMD': {
+                    // Moves up to 2 tiles in any direction (Land or Sea) and can jump
+                    addRayMoves(dirsAll, 2, true);
+                    break;
+                }
+
+                case 'INF': {
+                    const forward = team === 'BLUE' ? -1 : 1;
+                    // 1 step forward
+                    const r1 = r + forward;
+                    if (inBounds(r1, c) && canUnitStandOn('INF', r1, c)) {
+                        if (!board[r1][c]) {
+                            actions.push({ r: r1, c: c, actionType: 'MOVE' });
+                            // 2 steps on first move
+                            const r2 = r + forward * 2;
+                            if (!unit.moved && inBounds(r2, c) && canUnitStandOn('INF', r2, c) && !board[r2][c]) {
+                                actions.push({ r: r2, c: c, actionType: 'MOVE' });
+                            }
+                        } else if (board[r1][c].team !== team && canAttackerHurtTarget('INF', board[r1][c].type)) {
+                            // Front melee capture allowed per specification
+                            actions.push({ r: r1, c: c, actionType: 'CAPTURE' });
+                        }
+                    }
+                    // Diagonal forward captures
+                    for (const dc of [-1, 1]) {
+                        const nc = c + dc;
+                        if (inBounds(r1, nc) && canUnitStandOn('INF', r1, nc)) {
+                            const occ = board[r1][nc];
+                            if (occ && occ.team !== team && canAttackerHurtTarget('INF', occ.type)) {
+                                actions.push({ r: r1, c: nc, actionType: 'CAPTURE' });
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+
+            return actions;
+        }
+
+        /**************************************************************
+         * 5. BOARD RENDERING & INTERACTION
+         **************************************************************/
+        function renderBoard() {
+            const grid = document.getElementById('boardGrid');
+            grid.innerHTML = '';
+
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    const tile = document.createElement('div');
+                    tile.className = 'tile';
+                    tile.dataset.r = r;
+                    tile.dataset.c = c;
+
+                    // Terrain background class
+                    const isDark = (r + c) % 2 === 1;
+                    if (isGoldMineTile(r, c)) {
+                        tile.classList.add('terrain-gold');
+                    } else if (isSeaTile(r, c)) {
+                        tile.classList.add(isDark ? 'terrain-sea-dark' : 'terrain-sea-light');
+                    } else {
+                        tile.classList.add(isDark ? 'terrain-land-dark' : 'terrain-land-light');
+                    }
+
+                    // Subtle terrain watermark for empty special squares
+                    const piece = board[r][c];
+                    if (!piece) {
+                        if (isGoldMineTile(r, c)) {
+                            tile.innerHTML = '<span class="text-[10px] opacity-70 pointer-events-none">⛏️</span>';
+                        } else if (isSeaTile(r, c) && (r + c) % 4 === 0) {
+                            tile.innerHTML = '<span class="text-[8px] text-sky-300/25 pointer-events-none">≈</span>';
+                        }
+                    }
+
+                    // Highlights
+                    if (selectedTile && selectedTile.r === r && selectedTile.c === c) {
+                        tile.classList.add('hl-selected');
+                    }
+                    if (lastMove && ((lastMove.fromR === r && lastMove.fromC === c) || (lastMove.toR === r && lastMove.toC === c))) {
+                        tile.classList.add('hl-lastmove');
+                    }
+
+                    const action = validActions.find(a => a.r === r && a.c === c);
+                    if (action) {
+                        if (action.actionType === 'MOVE') tile.classList.add('hl-move');
+                        else if (action.actionType === 'CAPTURE') tile.classList.add('hl-capture');
+                        else if (action.actionType === 'RANGED') tile.classList.add('hl-ranged');
+                    }
+
+                    // Render Unit Token
+                    if (piece) {
+                        const info = UNIT_TYPES[piece.type];
+                        const wrapper = document.createElement('div');
+                        wrapper.className = `unit-wrapper ${piece.team === 'BLUE' ? 'unit-blue' : 'unit-red'}`;
+                        wrapper.innerHTML = `
+                            <span class="unit-emoji">${info.emoji}</span>
+                            <span class="unit-code">${info.code}</span>
+                        `;
+                        tile.appendChild(wrapper);
+                    }
+
+                    tile.addEventListener('click', () => onTileClick(r, c));
+                    tile.addEventListener('mouseenter', () => {
+                        if (board[r][c]) updateInspector(board[r][c].type, board[r][c].team);
+                    });
+
+                    grid.appendChild(tile);
+                }
+            }
+
+            updateHUD();
+        }
+
+        function onTileClick(r, c) {
+            if (gameOver || pendingPromotion) return;
+            if (vsAI && currentTurn === 'RED') return; // Wait for AI
+
+            // Check if clicked on a valid action for currently selected piece
+            const chosenAction = validActions.find(a => a.r === r && a.c === c);
+            if (selectedTile && chosenAction) {
+                executeAction(selectedTile.r, selectedTile.c, chosenAction);
+                return;
+            }
+
+            const clickedUnit = board[r][c];
+            if (clickedUnit) {
+                updateInspector(clickedUnit.type, clickedUnit.team);
+                if (clickedUnit.team === currentTurn) {
+                    selectedTile = { r, c };
+                    validActions = getValidActionsForUnit(r, c);
+                    playSound('select');
+                    renderBoard();
+                    return;
+                }
+            }
+
+            // Deselect if clicked elsewhere
+            selectedTile = null;
+            validActions = [];
+            renderBoard();
+        }
+
+        function spawnExplosionAt(r, c, icon = '💥') {
+            const index = r * BOARD_SIZE + c;
+            const grid = document.getElementById('boardGrid');
+            const tile = grid.children[index];
+            if (!tile) return;
+            const fx = document.createElement('div');
+            fx.className = 'explosion-fx';
+            fx.innerText = icon;
+            tile.appendChild(fx);
+            setTimeout(() => fx.remove(), 550);
+        }
+
+        function executeAction(fromR, fromC, action) {
+            const attacker = board[fromR][fromC];
+            const target = board[action.r][action.c];
+            const attackerInfo = UNIT_TYPES[attacker.type];
+
+            if (action.actionType === 'MOVE') {
+                board[action.r][action.c] = attacker;
+                board[fromR][fromC] = null;
+                attacker.moved = true;
+                playSound('move');
+                addBattleLog(`${attacker.team === 'BLUE' ? '🔵' : '🔴'} ${attackerInfo.emoji} ${attacker.type} moved to (${action.r}, ${action.c}).`);
+            } else if (action.actionType === 'CAPTURE') {
+                const targetInfo = UNIT_TYPES[target.type];
+                board[action.r][action.c] = attacker;
+                board[fromR][fromC] = null;
+                attacker.moved = true;
+                playSound('capture');
+                addBattleLog(`⚔️ ${attacker.team} ${attackerInfo.emoji} ${attacker.type} destroyed ${target.team} ${targetInfo.emoji} ${target.type}!`, true);
+            } else if (action.actionType === 'RANGED') {
+                // Ranged Strike! Target is destroyed, Attacker stays on fromR, fromC!
+                const targetInfo = UNIT_TYPES[target.type];
+                board[action.r][action.c] = null;
+                attacker.moved = true;
+                playSound('ranged');
+                addBattleLog(`🎯 RANGED STRIKE! ${attacker.team} ${attackerInfo.emoji} ${attacker.type} blasted ${target.team} ${targetInfo.emoji} ${target.type} from afar!`, true);
+            }
+
+            lastMove = { fromR, fromC, toR: action.r, toC: action.c };
+            selectedTile = null;
+            validActions = [];
+
+            // Check if Infantry reached opposite end for Promotion (only if it moved onto the final rank)
+            if (action.actionType !== 'RANGED' && attacker.type === 'INF') {
+                if ((attacker.team === 'BLUE' && action.r === 0) || (attacker.team === 'RED' && action.r === BOARD_SIZE - 1)) {
+                    if (vsAI && attacker.team === 'RED') {
+                        attacker.type = 'BMB'; // AI auto-promotes to Bomber
+                        addBattleLog(`🎖️ RED Infantry promoted to Strategic Bomber (🛸 BMB)!`, true);
+                    } else {
+                        pendingPromotion = { r: action.r, c: action.c, team: attacker.team };
+                        renderBoard();
+                        document.getElementById('promoModal').classList.remove('hidden');
+                        document.getElementById('promoModal').classList.add('flex');
+                        return;
+                    }
+                }
+            }
+
+            finishTurnAfterAction(action);
+        }
+
+        function completePromotion(newType) {
+            if (!pendingPromotion) return;
+            const { r, c, team } = pendingPromotion;
+            if (board[r][c]) {
+                board[r][c].type = newType;
+                addBattleLog(`🎖️ ${team} Infantry promoted to ${UNIT_TYPES[newType].emoji} ${newType}!`, true);
+            }
+            pendingPromotion = null;
+            document.getElementById('promoModal').classList.add('hidden');
+            document.getElementById('promoModal').classList.remove('flex');
+            finishTurnAfterAction({ r, c, actionType: 'MOVE' });
+        }
+
+        function finishTurnAfterAction(action) {
+            renderBoard();
+            if (action.actionType === 'CAPTURE' || action.actionType === 'RANGED') {
+                spawnExplosionAt(action.r, action.c, action.actionType === 'RANGED' ? '🚀' : '💥');
+            }
+
+            if (checkVictoryConditions()) return;
+
+            // Switch turn
+            currentTurn = currentTurn === 'BLUE' ? 'RED' : 'BLUE';
+            if (currentTurn === 'BLUE') {
+                turnNumber++;
+                document.getElementById('proTipText').innerText = PRO_TIPS[turnNumber % PRO_TIPS.length];
+            }
+            updateHUD();
+
+            if (vsAI && currentTurn === 'RED' && !gameOver) {
+                setTimeout(makeAIMove, 480);
+            }
+        }
+
+        /**************************************************************
+         * 6. VICTORY CONDITIONS & HUD UPDATES
+         **************************************************************/
+        function checkVictoryConditions() {
+            let blueHQ = false, redHQ = false;
+            let blueTotal = 0, redTotal = 0;
+
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    const p = board[r][c];
+                    if (!p) continue;
+                    if (p.team === 'BLUE') {
+                        blueTotal++;
+                        if (p.type === 'HQ') blueHQ = true;
+                    } else {
+                        redTotal++;
+                        if (p.type === 'HQ') redHQ = true;
+                    }
+                }
+            }
+
+            if (!redHQ || redTotal === 0) {
+                triggerVictory('BLUE', 'Red Syndicate ka Command Bunker (🏛️ HQ) tabah kar diya gaya!');
+                return true;
+            }
+            if (!blueHQ || blueTotal === 0) {
+                triggerVictory('RED', 'Blue Coalition ka Command Bunker (🏛️ HQ) tabah ho gaya!');
+                return true;
+            }
+            return false;
+        }
+
+        function triggerVictory(winnerTeam, reason) {
+            gameOver = true;
+            playSound('win');
+            const modal = document.getElementById('victoryModal');
+            document.getElementById('vicIcon').innerText = winnerTeam === 'BLUE' ? '🏆' : '⚔️';
+            document.getElementById('vicTitle').innerText = winnerTeam === 'BLUE' ? '🔵 BLUE COALITION WINS!' : '🔴 RED SYNDICATE WINS!';
+            document.getElementById('vicReason').innerText = reason;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeVictoryAndRestart() {
+            document.getElementById('victoryModal').classList.add('hidden');
+            document.getElementById('victoryModal').classList.remove('flex');
+            resetGame();
+        }
+
+        function updateHUD() {
+            let blueCount = 0, redCount = 0;
+            let blueGold = 0, redGold = 0;
+            let blueMines = 0, redMines = 0;
+
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    const p = board[r][c];
+                    if (!p) continue;
+                    if (p.team === 'BLUE') {
+                        blueCount++;
+                        if (p.type === 'GLD') blueGold++;
+                        if (isGoldMineTile(r, c)) blueMines++;
+                    } else {
+                        redCount++;
+                        if (p.type === 'GLD') redGold++;
+                        if (isGoldMineTile(r, c)) redMines++;
+                    }
+                }
+            }
+
+            document.getElementById('blueUnitsCount').innerText = `${blueCount}/32`;
+            document.getElementById('redUnitsCount').innerText = `${redCount}/32`;
+
+            const bGoldEl = document.getElementById('blueGoldCount');
+            bGoldEl.innerText = blueGold > 0 ? `${blueGold}/2 (Full Fuel)` : `0/2 (CRIPPLED!)`;
+            bGoldEl.className = blueGold > 0 ? 'font-bold text-amber-400' : 'font-bold text-rose-400 animate-pulse';
+
+            const rGoldEl = document.getElementById('redGoldCount');
+            rGoldEl.innerText = redGold > 0 ? `${redGold}/2 (Full Fuel)` : `0/2 (CRIPPLED!)`;
+            rGoldEl.className = redGold > 0 ? 'font-bold text-amber-400' : 'font-bold text-rose-400 animate-pulse';
+
+            document.getElementById('blueMinesCount').innerText = blueMines;
+            document.getElementById('redMinesCount').innerText = redMines;
+            document.getElementById('turnCounter').innerText = `Turn #${turnNumber}`;
+
+            const badge = document.getElementById('turnBadge');
+            if (currentTurn === 'BLUE') {
+                badge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-blue-600 text-white shadow-sm flex items-center gap-1.5';
+                badge.innerHTML = '🔵 BLUE COALITION KI CHAAL';
+            } else {
+                badge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-rose-600 text-white shadow-sm flex items-center gap-1.5';
+                badge.innerHTML = vsAI ? '🤖 RED AI SOCH RAHA HAI...' : '🔴 RED SYNDICATE KI CHAAL';
+            }
+        }
+
+        function updateInspector(unitCode, team = 'BLUE') {
+            const info = UNIT_TYPES[unitCode];
+            if (!info) return;
+            document.getElementById('inspEmoji').innerText = info.emoji;
+            document.getElementById('inspTitle').innerText = `${info.name}`;
+            const badge = document.getElementById('inspBadge');
+            badge.innerText = `${info.code} • ${info.domain}`;
+            badge.className = team === 'BLUE'
+                ? 'text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                : 'text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40';
+            document.getElementById('inspRole').innerText = `${info.role} (${info.count} per player)`;
+            document.getElementById('inspTerrain').innerText = info.terrainText;
+            document.getElementById('inspMove').innerText = info.moveText;
+            document.getElementById('inspSpecial').innerText = info.specialText;
+        }
+
+        function addBattleLog(msg, highlight = false) {
+            const log = document.getElementById('battleLog');
+            const entry = document.createElement('div');
+            entry.className = highlight ? 'text-amber-300 font-semibold' : 'text-slate-300';
+            entry.innerText = `» ${msg}`;
+            log.prepend(entry);
+        }
+
+        /**************************************************************
+         * 7. TACTICAL AI BOT (FOR RED SYNDICATE)
+         **************************************************************/
+        function makeAIMove() {
+            if (gameOver || currentTurn !== 'RED') return;
+
+            const allCandidateMoves = [];
+
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    const p = board[r][c];
+                    if (p && p.team === 'RED') {
+                        const actions = getValidActionsForUnit(r, c);
+                        for (const act of actions) {
+                            let score = 0;
+                            const target = board[act.r][act.c];
+
+                            if (target && target.team === 'BLUE') {
+                                score += UNIT_TYPES[target.type].value * 10;
+                                // Bonus for Ranged Strike since AI doesn't risk its own piece
+                                if (act.actionType === 'RANGED') score += 45;
+                            }
+
+                            // Encourage advancing toward Blue side (higher row index)
+                            if (act.actionType !== 'RANGED') {
+                                score += (act.r - r) * 3;
+                                // Center Gold Mine control bonus
+                                if (isGoldMineTile(act.r, act.c)) score += 25;
+                            }
+
+                            // Slight randomness so AI feels dynamic
+                            score += Math.random() * 8;
+                            allCandidateMoves.push({ fromR: r, fromC: c, action: act, score });
+                        }
+                    }
+                }
+            }
+
+            if (allCandidateMoves.length === 0) {
+                triggerVictory('BLUE', 'Red Syndicate ke paas koi valid chaal nahi bachi!');
+                return;
+            }
+
+            allCandidateMoves.sort((a, b) => b.score - a.score);
+            const best = allCandidateMoves[0];
+            executeAction(best.fromR, best.fromC, best.action);
+        }
+
+        /**************************************************************
+         * 8. UI CONTROLS, CATALOG & MODALS
+         **************************************************************/
+        function toggleGameMode() {
+            vsAI = !vsAI;
+            document.getElementById('modeLabel').innerText = vsAI ? 'Mode: vs AI Bot' : 'Mode: 2-Player Pass & Play';
+            if (vsAI && currentTurn === 'RED' && !gameOver) {
+                setTimeout(makeAIMove, 400);
+            }
+            updateHUD();
+        }
+
+        function resetGame() {
+            gameOver = false;
+            currentTurn = 'BLUE';
+            selectedTile = null;
+            validActions = [];
+            lastMove = null;
+            turnNumber = 1;
+            pendingPromotion = null;
+            createInitialFormation();
+            renderBoard();
+            updateInspector('HQ', 'BLUE');
+            document.getElementById('battleLog').innerHTML = '<div class="text-emerald-400">» New 32 vs 32 battle initialized! Blue Coalition moves first.</div>';
+        }
+
+        function openRulesModal() {
+            document.getElementById('rulesModal').classList.remove('hidden');
+            document.getElementById('rulesModal').classList.add('flex');
+        }
+
+        function closeRulesModal() {
+            document.getElementById('rulesModal').classList.add('hidden');
+            document.getElementById('rulesModal').classList.remove('flex');
+        }
+
+        function populateCatalogs() {
+            const catalogGrid = document.getElementById('unitCatalogGrid');
+            const rulesTable = document.getElementById('rulesUnitTable');
+            catalogGrid.innerHTML = '';
+            rulesTable.innerHTML = '';
+
+            Object.values(UNIT_TYPES).forEach(u => {
+                // Quick reference button
+                const btn = document.createElement('button');
+                btn.className = 'flex items-center gap-1.5 p-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 transition text-left';
+                btn.onclick = () => {
+                    updateInspector(u.code, 'BLUE');
+                    playSound('select');
+                };
+                btn.innerHTML = `
+                    <span class="text-base">${u.emoji}</span>
+                    <div class="leading-tight overflow-hidden">
+                        <div class="font-bold text-white text-[11px]">${u.code} <span class="text-slate-400 font-normal">x${u.count}</span></div>
+                        <div class="text-[9px] text-slate-400 truncate">${u.domain}</div>
+                    </div>
+                `;
+                catalogGrid.appendChild(btn);
+
+                // Rules Modal card
+                const card = document.createElement('div');
+                card.className = 'bg-slate-950 p-2.5 rounded-xl border border-slate-800';
+                card.innerHTML = `
+                    <div class="flex items-center justify-between font-bold text-white mb-1">
+                        <span>${u.emoji} ${u.name} (${u.code})</span>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-amber-300">x${u.count} • ${u.domain}</span>
+                    </div>
+                    <p class="text-[11px] text-emerald-300 mb-0.5"><strong>Chaal:</strong> ${u.moveText}</p>
+                    <p class="text-[11px] text-slate-300">${u.specialText}</p>
+                `;
+                rulesTable.appendChild(card);
+            });
+        }
+
+        window.onload = function () {
+            populateCatalogs();
+            resetGame();
+        };
+    </script>
+</body>
+</html>

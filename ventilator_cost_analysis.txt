@@ -1,0 +1,25 @@
+
+COMPLETE COST ANALYSIS - DIY VENTILATOR PROJECT
+================================================
+
+SINGLE UNIT RAW MATERIALS: ₹21,910
+SINGLE UNIT TOTAL COST   : ₹27,210
+
+BULK MANUFACTURING COSTS:
+ Quantity  Material (₹)  Labor (₹)  Test (₹)  Packaging (₹)  Total/Unit (₹)
+       10         19869       2000      1000            400           23269
+       50         17419       1200      1000            400           20019
+      100         15187        800       500            400           16887
+      500         13254        800       500            400           14954
+     1000         11825        800       500            400           13525
+
+BUSINESS MODEL COMPARISON:
+- Private Hospital Sale: ₹42,218 (2.5x margin)
+- Private Rental/Day   : ₹8,000/day
+- Govt Rental/Day      : ₹1,000/day
+- Govt Bulk Sale       : ₹20,936 (1.4x margin)
+
+RENTAL PAYBACK (1000 units, ₹1000/day):
+- 50% utilization: ~0.9 months
+- 70% utilization: ~0.6 months  
+- 85% utilization: ~0.5 months

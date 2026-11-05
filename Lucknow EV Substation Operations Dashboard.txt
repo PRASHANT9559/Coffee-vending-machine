@@ -1,0 +1,1121 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  Zap, 
+  BatteryCharging, 
+  AlertTriangle, 
+  MapPin, 
+  DollarSign, 
+  Activity, 
+  Server, 
+  Power, 
+  Wifi, 
+  WifiOff, 
+  CheckCircle2, 
+  RefreshCw, 
+  FileText, 
+  Send, 
+  Search, 
+  ShieldAlert, 
+  Sliders, 
+  TrendingUp, 
+  ChevronRight, 
+  Clock, 
+  Cpu, 
+  Building2, 
+  QrCode, 
+  Layers, 
+  ArrowUpRight, 
+  AlertOctagon,
+  Settings
+} from 'lucide-react';
+
+const LUCKNOW_LOCALITIES = [
+  'All Localities',
+  'Hazratganj',
+  'Gomti Nagar',
+  'Alambagh',
+  'Aminabad',
+  'Charbagh',
+  'Indira Nagar'
+];
+
+const INITIAL_KIOSKS = [
+  {
+    id: 'LKO-HG-001',
+    name: 'Sharma Tea Stall & Chai Point',
+    locality: 'Hazratganj',
+    address: 'Near Janpath Market, MG Marg',
+    hostName: 'Ramesh Sharma',
+    hostPhone: '+91 98390 12345',
+    upiId: 'sharmatea@okaxis',
+    status: 'online',
+    signal: '4G LTE - 86%',
+    firmware: 'v2.4.1-rust',
+    gridVoltage: 228.4,
+    totalEnergyMonth: 486.2,
+    monthlyGross: 19448,
+    hostPayoutDue: 7850,
+    ports: [
+      { id: 1, status: 'charging', user: 'Zomato Rider (UP32-ES-4912)', powerW: 760, currentA: 3.32, voltageV: 229, minsLeft: 42, totalMins: 90, energyKwh: 0.82 },
+      { id: 2, status: 'charging', user: 'Swiggy Rider (UP32-DN-0192)', powerW: 810, currentA: 3.55, voltageV: 228, minsLeft: 18, totalMins: 60, energyKwh: 0.69 },
+      { id: 3, status: 'available', user: null, powerW: 0, currentA: 0.0, voltageV: 229, minsLeft: 0, totalMins: 0, energyKwh: 0.0 },
+      { id: 4, status: 'charging', user: 'Blinkit Commuter (UP32-KJ-8821)', powerW: 745, currentA: 3.25, voltageV: 228, minsLeft: 76, totalMins: 120, energyKwh: 1.15 },
+    ]
+  },
+  {
+    id: 'LKO-GN-002',
+    name: 'Patel Cyber Cafe & Stationery',
+    locality: 'Gomti Nagar',
+    address: 'Viram Khand 2, Near Patrakar Puram',
+    hostName: 'Sanjay Patel',
+    hostPhone: '+91 94150 99421',
+    upiId: 'patelcyber@paytm',
+    status: 'online',
+    signal: '4G LTE - 92%',
+    firmware: 'v2.4.1-rust',
+    gridVoltage: 231.2,
+    totalEnergyMonth: 592.8,
+    monthlyGross: 24300,
+    hostPayoutDue: 9780,
+    ports: [
+      { id: 1, status: 'charging', user: 'Ola S1 Pro (UP32-MN-9923)', powerW: 1150, currentA: 4.98, voltageV: 231, minsLeft: 54, totalMins: 90, energyKwh: 1.45 },
+      { id: 2, status: 'charging', user: 'Ather 450X (UP32-BB-3301)', powerW: 840, currentA: 3.63, voltageV: 231, minsLeft: 29, totalMins: 60, energyKwh: 0.72 },
+      { id: 3, status: 'charging', user: 'Shadowfax Rider (UP32-AZ-4411)', powerW: 710, currentA: 3.07, voltageV: 230, minsLeft: 64, totalMins: 120, energyKwh: 0.94 },
+      { id: 4, status: 'charging', user: 'Private Rider (UP32-TR-2101)', powerW: 780, currentA: 3.38, voltageV: 231, minsLeft: 11, totalMins: 60, energyKwh: 0.65 },
+    ]
+  },
+  {
+    id: 'LKO-AL-003',
+    name: 'Yadav Kirana & Cold Drinks',
+    locality: 'Alambagh',
+    address: 'Phoenix Mall Road, Singar Nagar Gate',
+    hostName: 'Ramendra Yadav',
+    hostPhone: '+91 91290 44810',
+    upiId: 'ramendray@sbi',
+    status: 'online',
+    signal: '4G LTE - 79%',
+    firmware: 'v2.4.0-rust',
+    gridVoltage: 226.5,
+    totalEnergyMonth: 380.4,
+    monthlyGross: 15200,
+    hostPayoutDue: 6140,
+    ports: [
+      { id: 1, status: 'available', user: null, powerW: 0, currentA: 0.0, voltageV: 226, minsLeft: 0, totalMins: 0, energyKwh: 0.0 },
+      { id: 2, status: 'fault', user: 'Overload Trip', powerW: 0, currentA: 0.0, voltageV: 0, minsLeft: 0, totalMins: 0, energyKwh: 0.12 },
+      { id: 3, status: 'charging', user: 'Porter Delivery (UP32-PL-5112)', powerW: 690, currentA: 3.05, voltageV: 226, minsLeft: 34, totalMins: 60, energyKwh: 0.58 },
+      { id: 4, status: 'available', user: null, powerW: 0, currentA: 0.0, voltageV: 226, minsLeft: 0, totalMins: 0, energyKwh: 0.0 },
+    ]
+  },
+  {
+    id: 'LKO-AM-004',
+    name: 'Tunday Kababi Lane Pan Shop',
+    locality: 'Aminabad',
+    address: 'Nazirabad Market, Opposite Central Market',
+    hostName: 'Mohd. Salim Khan',
+    hostPhone: '+91 97920 11984',
+    upiId: 'salimkhan@icici',
+    status: 'online',
+    signal: '4G LTE - 88%',
+    firmware: 'v2.4.1-rust',
+    gridVoltage: 229.8,
+    totalEnergyMonth: 640.1,
+    monthlyGross: 26800,
+    hostPayoutDue: 10810,
+    ports: [
+      { id: 1, status: 'charging', user: 'Zomato Fleet (UP32-GG-1029)', powerW: 750, currentA: 3.26, voltageV: 230, minsLeft: 88, totalMins: 120, energyKwh: 1.28 },
+      { id: 2, status: 'charging', user: 'Courier Express (UP32-EE-8120)', powerW: 770, currentA: 3.34, voltageV: 230, minsLeft: 44, totalMins: 90, energyKwh: 0.95 },
+      { id: 3, status: 'charging', user: 'Rapido Captain (UP32-JJ-9921)', powerW: 730, currentA: 3.17, voltageV: 229, minsLeft: 22, totalMins: 60, energyKwh: 0.62 },
+      { id: 4, status: 'charging', user: 'Blinkit Delivery (UP32-LL-3012)', powerW: 760, currentA: 3.30, voltageV: 230, minsLeft: 5, totalMins: 60, energyKwh: 0.74 },
+    ]
+  },
+  {
+    id: 'LKO-CB-005',
+    name: 'Mishra Ji Puncture & Auto Hub',
+    locality: 'Charbagh',
+    address: 'Railway Station South Exit, Kanpur Road',
+    hostName: 'Vikas Mishra',
+    hostPhone: '+91 93350 78210',
+    upiId: 'mishraauto@hdfcbank',
+    status: 'offline',
+    signal: 'No GSM Signal',
+    firmware: 'v2.3.9-rust',
+    gridVoltage: 0.0,
+    totalEnergyMonth: 120.2,
+    monthlyGross: 4800,
+    hostPayoutDue: 1940,
+    ports: [
+      { id: 1, status: 'fault', user: null, powerW: 0, currentA: 0.0, voltageV: 0, minsLeft: 0, totalMins: 0, energyKwh: 0 },
+      { id: 2, status: 'fault', user: null, powerW: 0, currentA: 0.0, voltageV: 0, minsLeft: 0, totalMins: 0, energyKwh: 0 },
+      { id: 3, status: 'fault', user: null, powerW: 0, currentA: 0.0, voltageV: 0, minsLeft: 0, totalMins: 0, energyKwh: 0 },
+      { id: 4, status: 'fault', user: null, powerW: 0, currentA: 0.0, voltageV: 0, minsLeft: 0, totalMins: 0, energyKwh: 0 },
+    ]
+  },
+  {
+    id: 'LKO-IN-006',
+    name: 'Gupta Sweets & Fast Food',
+    locality: 'Indira Nagar',
+    address: 'Sector 14 Main Road, near Munshipulia Metro',
+    hostName: 'Anurag Gupta',
+    hostPhone: '+91 98890 55432',
+    upiId: 'guptasweets@kotak',
+    status: 'online',
+    signal: '4G LTE - 94%',
+    firmware: 'v2.4.1-rust',
+    gridVoltage: 230.1,
+    totalEnergyMonth: 512.4,
+    monthlyGross: 21100,
+    hostPayoutDue: 8520,
+    ports: [
+      { id: 1, status: 'charging', user: 'Ola S1 Air (UP32-ZZ-7111)', powerW: 760, currentA: 3.30, voltageV: 230, minsLeft: 59, totalMins: 90, energyKwh: 0.88 },
+      { id: 2, status: 'available', user: null, powerW: 0, currentA: 0.0, voltageV: 230, minsLeft: 0, totalMins: 0, energyKwh: 0.0 },
+      { id: 3, status: 'charging', user: 'Zomato Rider (UP32-PQ-4040)', powerW: 790, currentA: 3.43, voltageV: 230, minsLeft: 12, totalMins: 60, energyKwh: 0.71 },
+      { id: 4, status: 'available', user: null, powerW: 0, currentA: 0.0, voltageV: 230, minsLeft: 0, totalMins: 0, energyKwh: 0.0 },
+    ]
+  }
+];
+
+const INITIAL_ALERTS = [
+  {
+    id: 'ALT-1092',
+    timestamp: '2 mins ago',
+    nodeId: 'LKO-AL-003',
+    nodeName: 'Yadav Kirana, Alambagh',
+    port: 'Port 2',
+    severity: 'critical',
+    type: 'Overload / Splitter Detected',
+    message: 'Current spike 8.4A (>1.85kW). Suspected 2-to-1 extension splitter. Contactor auto-tripped.',
+    actionRequired: 'Manual Reset & Rider SMS Warning Sent'
+  },
+  {
+    id: 'ALT-1091',
+    timestamp: '14 mins ago',
+    nodeId: 'LKO-CB-005',
+    nodeName: 'Mishra Ji Auto, Charbagh',
+    port: 'Master Board',
+    severity: 'high',
+    type: 'Heartbeat Timeout / GSM Drop',
+    message: 'No ping from Quectel 4G module for > 15 minutes. Host main switchboard likely tripped.',
+    actionRequired: 'Alert sent to Lucknow Field Boy (Pawan Kumar)'
+  },
+  {
+    id: 'ALT-1090',
+    timestamp: '32 mins ago',
+    nodeId: 'LKO-HG-001',
+    nodeName: 'Sharma Tea Stall, Hazratganj',
+    port: 'Port 3',
+    severity: 'medium',
+    type: 'Zero Draw Auto-Refund Trigger',
+    message: 'Payment verified ₹35, but 0.00A current drawn after 8 mins. Rider forgot to turn on ignition switch.',
+    actionRequired: 'WhatsApp Notification & Auto-Refund Queued'
+  }
+];
+
+export default function EvSubstationDashboard() {
+  const [activeTab, setActiveTab] = useState('overview'); // overview, ports, payouts, alerts
+  const [kiosks, setKiosks] = useState(INITIAL_KIOSKS);
+  const [alerts, setAlerts] = useState(INITIAL_ALERTS);
+  const [selectedLocality, setSelectedLocality] = useState('All Localities');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedKioskId, setSelectedKioskId] = useState('LKO-HG-001');
+  const [payoutModalKiosk, setPayoutModalKiosk] = useState(null);
+  const [isProcessingPayout, setIsProcessingPayout] = useState(false);
+  const [payoutSuccess, setPayoutSuccess] = useState(false);
+  const [emergencyOverride, setEmergencyOverride] = useState(false);
+  const [liveSecondCounter, setLiveSecondCounter] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setLiveSecondCounter(prev => prev + 1);
+      
+      // Minor simulated wattage/voltage oscillation on active ports
+      setKiosks(prevKiosks => 
+        prevKiosks.map(kiosk => {
+          if (kiosk.status !== 'online') return kiosk;
+          const updatedPorts = kiosk.ports.map(port => {
+            if (port.status === 'charging') {
+              const deltaW = Math.floor(Math.random() * 11) - 5;
+              const newPower = Math.max(680, Math.min(1250, port.powerW + deltaW));
+              const newCurrent = Number((newPower / kiosk.gridVoltage).toFixed(2));
+              return {
+                ...port,
+                powerW: newPower,
+                currentA: newCurrent
+              };
+            }
+            return port;
+          });
+          return { ...kiosk, ports: updatedPorts };
+        })
+      );
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const filteredKiosks = useMemo(() => {
+    return kiosks.filter(kiosk => {
+      const matchLocality = selectedLocality === 'All Localities' || kiosk.locality === selectedLocality;
+      const matchSearch = kiosk.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          kiosk.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          kiosk.locality.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchLocality && matchSearch;
+    });
+  }, [kiosks, selectedLocality, searchQuery]);
+
+  const activeKiosk = kiosks.find(k => k.id === selectedKioskId) || kiosks[0];
+
+  // Global fleet metrics across 50 kiosks (extrapolated based on live sample)
+  const totalFleetNodes = 50;
+  const onlineNodes = 48;
+  const activePortsCount = 158;
+  const availablePortsCount = 34;
+  const faultPortsCount = 8;
+  const todayNetRevenue = 24850;
+  const todayTotalEnergy = 612.4;
+  const liveGridLoadKw = 114.2;
+
+  const handleTogglePort = (kioskId, portId) => {
+    setKiosks(prev => prev.map(k => {
+      if (k.id !== kioskId) return k;
+      const updatedPorts = k.ports.map(p => {
+        if (p.id !== portId) return p;
+        if (p.status === 'charging') {
+          return { ...p, status: 'available', powerW: 0, currentA: 0, minsLeft: 0, user: null };
+        } else if (p.status === 'available') {
+          return { 
+            ...p, 
+            status: 'charging', 
+            powerW: 750, 
+            currentA: 3.28, 
+            minsLeft: 60, 
+            totalMins: 60, 
+            user: 'Manual Override Admin Session' 
+          };
+        } else if (p.status === 'fault') {
+          return { ...p, status: 'available', powerW: 0, currentA: 0, minsLeft: 0, user: null };
+        }
+        return p;
+      });
+      return { ...k, ports: updatedPorts };
+    }));
+  };
+
+  const handleExecuteRazorpayXPayout = (kiosk) => {
+    setIsProcessingPayout(true);
+    setTimeout(() => {
+      setIsProcessingPayout(false);
+      setPayoutSuccess(true);
+      setTimeout(() => {
+        setPayoutSuccess(false);
+        setPayoutModalKiosk(null);
+        // zero out due
+        setKiosks(prev => prev.map(item => item.id === kiosk.id ? { ...item, hostPayoutDue: 0 } : item));
+      }, 1500);
+    }, 1200);
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased flex flex-col selection:bg-emerald-500 selection:text-slate-950">
+      
+      {}
+      <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-40 px-4 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+            <Zap className="h-6 w-6 text-slate-950 stroke-[2.5]" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-bold tracking-tight text-white flex items-center gap-1.5">
+                URJA-GRID <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-mono font-medium border border-emerald-500/20">LUCKNOW NOC</span>
+              </h1>
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-950/80 text-emerald-300 border border-emerald-800">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-pulse"></span>
+                RUST + TIMESCALE LIVE
+              </span>
+            </div>
+            <p className="text-xs text-slate-400">50 Autonomous Kiosks • 200 Sub-Station Ports</p>
+          </div>
+        </div>
+
+        {/* Global Key Metrics Badges */}
+        <div className="hidden xl:flex items-center gap-6 bg-slate-950/60 border border-slate-800/80 rounded-xl px-4 py-2">
+          <div className="flex items-center gap-2">
+            <Activity className="h-4 w-4 text-emerald-400" />
+            <div>
+              <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Active Fleet Load</div>
+              <div className="text-sm font-bold text-white font-mono">{liveGridLoadKw} kW</div>
+            </div>
+          </div>
+          <div className="h-6 w-[1px] bg-slate-800" />
+          <div className="flex items-center gap-2">
+            <BatteryCharging className="h-4 w-4 text-cyan-400" />
+            <div>
+              <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Port Utilization</div>
+              <div className="text-sm font-bold text-cyan-300 font-mono">158 / 200 (79%)</div>
+            </div>
+          </div>
+          <div className="h-6 w-[1px] bg-slate-800" />
+          <div className="flex items-center gap-2">
+            <DollarSign className="h-4 w-4 text-amber-400" />
+            <div>
+              <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Today Gross Net</div>
+              <div className="text-sm font-bold text-amber-300 font-mono">₹{todayNetRevenue.toLocaleString('en-IN')}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons & Time */}
+        <div className="flex items-center gap-2.5">
+          <button 
+            onClick={() => setEmergencyOverride(!emergencyOverride)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all border ${
+              emergencyOverride 
+                ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse' 
+                : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+            }`}
+          >
+            <ShieldAlert className="h-3.5 w-3.5" />
+            <span>{emergencyOverride ? 'EMERGENCY MODE ACTIVE' : 'Safety Grid Tripper'}</span>
+          </button>
+
+          <button 
+            onClick={() => setActiveTab('payouts')}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center gap-1.5 transition-colors shadow-sm"
+          >
+            <Send className="h-3.5 w-3.5" />
+            <span>Host Auto-Payouts</span>
+          </button>
+        </div>
+      </header>
+
+      {}
+      <div className="border-b border-slate-800/80 bg-slate-900/50 px-4 lg:px-8 py-2.5 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-1.5 overflow-x-auto">
+          {[
+            { id: 'overview', label: 'Fleet Overview & Map', icon: Layers },
+            { id: 'ports', label: 'Live Port Telemetry (Deep Dive)', icon: Activity },
+            { id: 'payouts', label: 'Dukandar Auto-Payout Ledger', icon: DollarSign },
+            { id: 'alerts', label: 'Hardware Anomaly & Safety Log', icon: AlertTriangle, badge: alerts.length },
+          ].map(tab => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  isActive 
+                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' 
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                <span>{tab.label}</span>
+                {tab.badge && (
+                  <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Global Location Dropdown & Search */}
+        <div className="flex items-center gap-2 flex-grow sm:flex-grow-0">
+          <div className="relative">
+            <Search className="h-3.5 w-3.5 absolute left-2.5 top-2.5 text-slate-500" />
+            <input 
+              type="text" 
+              placeholder="Search Station / Dukandar / Locality..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-slate-950 border border-slate-800 rounded-lg pl-8 pr-3 py-1 text-xs text-slate-200 focus:outline-none focus:border-emerald-500 w-44 lg:w-56"
+            />
+          </div>
+
+          <select 
+            value={selectedLocality}
+            onChange={(e) => setSelectedLocality(e.target.value)}
+            className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-300 focus:outline-none focus:border-emerald-500"
+          >
+            {LUCKNOW_LOCALITIES.map(loc => (
+              <option key={loc} value={loc}>{loc}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {}
+      <main className="flex-1 p-4 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
+
+        {/* TAB 1: FLEET OVERVIEW & MAP */}
+        {activeTab === 'overview' && (
+          <div className="space-y-6">
+            
+            {/* Top Stat Ribbon */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4 relative overflow-hidden">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-xs text-slate-400 font-medium">Active Kiosks (Stations)</p>
+                    <h3 className="text-2xl font-bold text-white mt-1 font-mono">48 <span className="text-xs text-slate-500">/ 50 deployed</span></h3>
+                  </div>
+                  <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <Building2 className="h-4 w-4" />
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center text-[11px] text-emerald-400 gap-1">
+                  <Wifi className="h-3 w-3" /> 96% 4G Quectel LTE Link Stability
+                </div>
+              </div>
+
+              <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-xs text-slate-400 font-medium">Substation Ports Occupied</p>
+                    <h3 className="text-2xl font-bold text-cyan-400 mt-1 font-mono">158 <span className="text-xs text-slate-500">/ 200 total</span></h3>
+                  </div>
+                  <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                    <Power className="h-4 w-4" />
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center text-[11px] text-cyan-300 gap-1">
+                  <Activity className="h-3 w-3" /> 34 Available • 8 Auto-Tripped/Fault
+                </div>
+              </div>
+
+              <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-xs text-slate-400 font-medium">Daily Energy Dispatched</p>
+                    <h3 className="text-2xl font-bold text-white mt-1 font-mono">612.4 <span className="text-xs text-slate-500">kWh</span></h3>
+                  </div>
+                  <div className="p-2 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                    <TrendingUp className="h-4 w-4" />
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center text-[11px] text-slate-400 gap-1">
+                  Avg. consumption: 0.94 kWh per scooter
+                </div>
+              </div>
+
+              <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-xs text-slate-400 font-medium">Net 24h Revenue</p>
+                    <h3 className="text-2xl font-bold text-emerald-400 mt-1 font-mono">₹24,850</h3>
+                  </div>
+                  <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <DollarSign className="h-4 w-4" />
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center text-[11px] text-emerald-400 gap-1">
+                  <ArrowUpRight className="h-3 w-3" /> +18.4% vs last week (Zomato Rush)
+                </div>
+              </div>
+            </div>
+
+            {/* Lucknow Grid Distribution & Interactive Cluster Visualizer */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              
+              {/* Lucknow City Hub Topology */}
+              <div className="lg:col-span-2 bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-emerald-400" />
+                      Lucknow City Substation Map Simulator
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-0.5">Real-time status of commercial 4-port nodes at kirana & tea points</p>
+                  </div>
+                  <span className="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                    MQTT Latency: 42ms
+                  </span>
+                </div>
+
+                {/* Simulated Geographic Grid */}
+                <div className="relative w-full h-80 rounded-xl bg-slate-950 border border-slate-800 overflow-hidden p-4 flex flex-col justify-between">
+                  <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] opacity-40"></div>
+                  
+                  {/* Gomti River Outline visual accent */}
+                  <div className="absolute top-12 left-0 right-0 h-10 border-b border-cyan-900/30 -rotate-3 pointer-events-none">
+                    <span className="absolute right-6 top-3 text-[10px] text-cyan-700/60 font-mono tracking-widest uppercase">Gomti River Corridor</span>
+                  </div>
+
+                  {/* Kiosk Markers */}
+                  <div className="relative z-10 grid grid-cols-3 gap-3 h-full">
+                    {kiosks.map((kiosk) => {
+                      const isSelected = kiosk.id === selectedKioskId;
+                      const activeCount = kiosk.ports.filter(p => p.status === 'charging').length;
+                      return (
+                        <div
+                          key={kiosk.id}
+                          onClick={() => setSelectedKioskId(kiosk.id)}
+                          className={`cursor-pointer p-3 rounded-xl border transition-all flex flex-col justify-between ${
+                            isSelected 
+                              ? 'bg-slate-800/90 border-emerald-500 shadow-lg shadow-emerald-500/10' 
+                              : 'bg-slate-900/80 border-slate-800 hover:border-slate-700 hover:bg-slate-850'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-950 text-slate-300 border border-slate-800">
+                              {kiosk.id}
+                            </span>
+                            <span className={`w-2 h-2 rounded-full ${kiosk.status === 'online' ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`} />
+                          </div>
+
+                          <div>
+                            <h4 className="text-xs font-semibold text-slate-200 truncate">{kiosk.name}</h4>
+                            <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                              <MapPin className="h-2.5 w-2.5 text-slate-500" /> {kiosk.locality}
+                            </p>
+                          </div>
+
+                          {/* Port Status Dots */}
+                          <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
+                            <div className="flex items-center gap-1">
+                              {kiosk.ports.map(p => (
+                                <span 
+                                  key={p.id} 
+                                  className={`w-2 h-2 rounded-full ${
+                                    p.status === 'charging' 
+                                      ? 'bg-cyan-400' 
+                                      : p.status === 'fault' 
+                                      ? 'bg-rose-500' 
+                                      : 'bg-slate-700'
+                                  }`} 
+                                  title={`Port ${p.id}: ${p.status}`}
+                                />
+                              ))}
+                            </div>
+                            <span className="text-[10px] font-mono font-medium text-emerald-400">
+                              {activeCount}/4 Busy
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Legend */}
+                <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-slate-400">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-cyan-400"></span> Charging (Active Load)
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-slate-700"></span> Available (Idle)
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Anomaly / Overload Cut
+                  </div>
+                </div>
+              </div>
+
+              {/* Station Leaderboard & High/Low Performing Nodes */}
+              <div className="space-y-4">
+                <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4">
+                  <h3 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-3">
+                    <TrendingUp className="h-4 w-4 text-emerald-400" />
+                    Top High-Yield Sub-stations
+                  </h3>
+                  <div className="space-y-2.5">
+                    {[
+                      { name: 'Patel Cyber Cafe', loc: 'Gomti Nagar', rev: '₹24,300/mo', units: '592 kWh', tag: 'Fast ROI' },
+                      { name: 'Tunday Kababi Lane', loc: 'Aminabad', rev: '₹26,800/mo', units: '640 kWh', tag: 'High Night Load' },
+                      { name: 'Sharma Tea Point', loc: 'Hazratganj', rev: '₹19,448/mo', units: '486 kWh', tag: 'Steady Day' },
+                    ].map((station, i) => (
+                      <div key={i} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
+                        <div>
+                          <div className="text-xs font-semibold text-slate-200">{station.name}</div>
+                          <div className="text-[10px] text-slate-400">{station.loc} • {station.units}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xs font-mono font-bold text-emerald-400">{station.rev}</div>
+                          <span className="text-[9px] font-semibold px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-300">
+                            {station.tag}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Relocation Suggestions */}
+                <div className="bg-rose-950/20 border border-rose-900/40 rounded-2xl p-4">
+                  <div className="flex items-center gap-2 text-rose-400 text-xs font-semibold">
+                    <AlertOctagon className="h-4 w-4" />
+                    Low-Usage Relocation Alert
+                  </div>
+                  <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                    <strong>Node #LKO-CB-005 (Charbagh Auto Hub)</strong> is averaging &lt;1.8 sessions/day due to street parking bans. 
+                  </p>
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-[10px] text-rose-300 font-mono">Recommendation:</span>
+                    <button className="text-[11px] font-medium text-emerald-400 hover:underline">
+                      Relocate to Alambagh Metro Gate 3 &rarr;
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        )}
+
+        {/* TAB 2: LIVE PORT TELEMETRY (DEEP DIVE) */}
+        {activeTab === 'ports' && (
+          <div className="space-y-6">
+            
+            {/* Top Node Selector Ribbon */}
+            <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <Cpu className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base font-bold text-white">{activeKiosk.name}</h2>
+                    <span className="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                      {activeKiosk.id}
+                    </span>
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
+                      {activeKiosk.signal}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Host: <strong className="text-slate-300">{activeKiosk.hostName}</strong> ({activeKiosk.hostPhone}) • {activeKiosk.address}
+                  </p>
+                </div>
+              </div>
+
+              {/* Quick Node Switcher Buttons */}
+              <div className="flex items-center gap-1.5 overflow-x-auto">
+                {kiosks.map(k => (
+                  <button
+                    key={k.id}
+                    onClick={() => setSelectedKioskId(k.id)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-colors ${
+                      k.id === selectedKioskId 
+                        ? 'bg-emerald-500 text-slate-950 font-bold' 
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    {k.id.replace('LKO-', '')}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Grid of the 4 Substation Ports for this Node */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {activeKiosk.ports.map((port) => {
+                const isCharging = port.status === 'charging';
+                const isAvailable = port.status === 'available';
+                const isFault = port.status === 'fault';
+                const percentDone = port.totalMins > 0 ? Math.round(((port.totalMins - port.minsLeft) / port.totalMins) * 100) : 0;
+
+                return (
+                  <div 
+                    key={port.id} 
+                    className={`rounded-2xl border p-4 transition-all relative overflow-hidden flex flex-col justify-between ${
+                      isCharging 
+                        ? 'bg-slate-900/90 border-cyan-500/40 shadow-lg shadow-cyan-500/5' 
+                        : isFault 
+                        ? 'bg-rose-950/30 border-rose-800/60' 
+                        : 'bg-slate-900/40 border-slate-800'
+                    }`}
+                  >
+                    {/* Background glow if active */}
+                    {isCharging && (
+                      <div className="absolute top-0 right-0 w-28 h-28 bg-cyan-500/10 rounded-full blur-2xl pointer-events-none"></div>
+                    )}
+
+                    {/* Top status bar */}
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                          <Power className={`h-4 w-4 ${isCharging ? 'text-cyan-400' : isFault ? 'text-rose-400' : 'text-slate-600'}`} />
+                          PORT #0{port.id} (16A)
+                        </span>
+
+                        <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full border ${
+                          isCharging 
+                            ? 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30' 
+                            : isFault 
+                            ? 'bg-rose-500/20 text-rose-300 border-rose-500/40' 
+                            : 'bg-slate-800 text-slate-400 border-slate-700'
+                        }`}>
+                          {port.status}
+                        </span>
+                      </div>
+
+                      {/* Rider session details */}
+                      <div className="mt-3">
+                        <div className="text-[11px] text-slate-400">Assigned Session:</div>
+                        <div className="text-xs font-medium text-slate-200 truncate mt-0.5">
+                          {port.user || 'Socket Idle / Ready for Scan'}
+                        </div>
+                      </div>
+
+                      {/* Real-time Electrical Gauges */}
+                      <div className="grid grid-cols-3 gap-2 mt-4 p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/80 text-center font-mono">
+                        <div>
+                          <div className="text-[9px] text-slate-500 uppercase">Power</div>
+                          <div className={`text-xs font-bold ${isCharging ? 'text-cyan-300' : 'text-slate-400'}`}>
+                            {port.powerW} W
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-[9px] text-slate-500 uppercase">Current</div>
+                          <div className="text-xs font-bold text-slate-200">
+                            {port.currentA} A
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-[9px] text-slate-500 uppercase">Grid V</div>
+                          <div className="text-xs font-bold text-slate-200">
+                            {port.voltageV} V
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Countdown & Progress bar */}
+                      {isCharging && (
+                        <div className="mt-4 space-y-1.5">
+                          <div className="flex justify-between text-xs font-mono">
+                            <span className="text-slate-400 flex items-center gap-1">
+                              <Clock className="h-3 w-3 text-cyan-400" /> Time Left:
+                            </span>
+                            <span className="font-bold text-cyan-300">{port.minsLeft} mins</span>
+                          </div>
+                          <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                            <div 
+                              className="bg-cyan-400 h-full rounded-full transition-all duration-500" 
+                              style={{ width: `${percentDone}%` }}
+                            />
+                          </div>
+                          <div className="flex justify-between text-[10px] text-slate-500">
+                            <span>Energy: {port.energyKwh} kWh</span>
+                            <span>{percentDone}%</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Contactor Manual Trigger / Remote Override */}
+                    <div className="mt-5 pt-3 border-t border-slate-800/80 flex items-center justify-between">
+                      <span className="text-[11px] text-slate-400">Contactor Relay:</span>
+                      <button
+                        onClick={() => handleTogglePort(activeKiosk.id, port.id)}
+                        className={`text-xs px-2.5 py-1 rounded-lg font-semibold transition-all border ${
+                          isCharging 
+                            ? 'bg-rose-500/10 text-rose-300 border-rose-500/30 hover:bg-rose-500/20' 
+                            : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20'
+                        }`}
+                      >
+                        {isCharging ? 'Force Cut OFF' : isFault ? 'Reset Port' : 'Manual Activate'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Diagnostic ESP32 Terminal Log for this Station */}
+            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 font-mono text-xs">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
+                <span className="text-slate-400 flex items-center gap-2">
+                  <Server className="h-3.5 w-3.5 text-emerald-400" />
+                  ESP32 Telemetry Terminal Stream (MQTT topic: `lko/{activeKiosk.id}/telemetry`)
+                </span>
+                <span className="text-[10px] text-emerald-400">LIVE WEBSOCKET CONNECTED</span>
+              </div>
+              <div className="space-y-1 text-slate-400 leading-relaxed text-[11px]">
+                <div>[18:32:04] <span className="text-cyan-400">PZEM004T_CH1</span>: V=229.1V | I=3.32A | W=760.6W | Pf=0.98 | Wh=824</div>
+                <div>[18:32:04] <span className="text-cyan-400">PZEM004T_CH2</span>: V=228.4V | I=3.55A | W=810.8W | Pf=0.99 | Wh=692</div>
+                <div>[18:32:04] <span className="text-slate-500">PZEM004T_CH3</span>: V=229.0V | I=0.00A | W=0.0W | [STANDBY_READY]</div>
+                <div>[18:32:04] <span className="text-cyan-400">PZEM004T_CH4</span>: V=228.2V | I=3.25A | W=745.2W | Pf=0.97 | Wh=1150</div>
+                <div>[18:32:05] <span className="text-emerald-400">HEARTBEAT_ACK</span>: RSSI=-64dBm (Quectel EC200U-CN) | Heap Free: 184,290 bytes</div>
+              </div>
+            </div>
+
+          </div>
+        )}
+
+        {/* TAB 3: DUKANDAR AUTO-PAYOUT & SETTLEMENTS */}
+        {activeTab === 'payouts' && (
+          <div className="space-y-6">
+            
+            {/* Dukandar Payout Explanation Ribbon */}
+            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <DollarSign className="h-5 w-5 text-emerald-400" />
+                  Dukandar Automated Electricity Refund & 30% Margin Split Ledger
+                </h2>
+                <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed">
+                  Formula: <strong>(Total kWh × ₹9/unit Commercial Tariff Refund) + (Net Profit × 30% Host Cut)</strong>. 
+                  Directly dispatched to Shopkeeper bank accounts via RazorpayX / Cashfree Payouts on the 1st of every month.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => alert("Statement downloaded for 50 stations.")}
+                  className="px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 transition-colors"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  Export CSV / Tally Sheet
+                </button>
+              </div>
+            </div>
+
+            {/* Payouts Table */}
+            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-950/80 text-slate-400 uppercase font-mono border-b border-slate-800">
+                    <tr>
+                      <th className="py-3 px-4">Station / Dukandar</th>
+                      <th className="py-3 px-4">Locality</th>
+                      <th className="py-3 px-4">Energy Used</th>
+                      <th className="py-3 px-4">Electricity Refund (@₹9)</th>
+                      <th className="py-3 px-4">30% Host Margin</th>
+                      <th className="py-3 px-4">Total Due</th>
+                      <th className="py-3 px-4">Host Bank / UPI</th>
+                      <th className="py-3 px-4 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/80 font-sans">
+                    {filteredKiosks.map((kiosk) => {
+                      const electricityCost = Math.round(kiosk.totalEnergyMonth * 9);
+                      const hostMargin = Math.round(kiosk.monthlyGross * 0.30 - (electricityCost * 0.15));
+                      const totalPayout = kiosk.hostPayoutDue;
+
+                      return (
+                        <tr key={kiosk.id} className="hover:bg-slate-850/50 transition-colors">
+                          <td className="py-3.5 px-4">
+                            <div className="font-semibold text-slate-200">{kiosk.name}</div>
+                            <div className="text-[11px] text-slate-400 font-mono">{kiosk.id} • {kiosk.hostName}</div>
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-300">{kiosk.locality}</td>
+                          <td className="py-3.5 px-4 font-mono text-cyan-400 font-semibold">{kiosk.totalEnergyMonth} kWh</td>
+                          <td className="py-3.5 px-4 font-mono text-slate-300">₹{electricityCost.toLocaleString('en-IN')}</td>
+                          <td className="py-3.5 px-4 font-mono text-slate-300">₹{hostMargin.toLocaleString('en-IN')}</td>
+                          <td className="py-3.5 px-4 font-mono font-bold text-emerald-400">
+                            {totalPayout > 0 ? `₹${totalPayout.toLocaleString('en-IN')}` : <span className="text-slate-500 font-normal">Paid</span>}
+                          </td>
+                          <td className="py-3.5 px-4 font-mono text-[11px] text-slate-400">
+                            {kiosk.upiId}
+                          </td>
+                          <td className="py-3.5 px-4 text-right">
+                            {totalPayout > 0 ? (
+                              <button
+                                onClick={() => setPayoutModalKiosk(kiosk)}
+                                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500 hover:bg-emerald-400 text-slate-950 transition-colors shadow-sm"
+                              >
+                                Trigger RazorpayX
+                              </button>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[11px] text-slate-500">
+                                <CheckCircle2 className="h-3 w-3 text-emerald-400" /> Settled
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        )}
+
+        {/* TAB 4: HARDWARE & ALERT CENTER */}
+        {activeTab === 'alerts' && (
+          <div className="space-y-6">
+            
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-amber-400" />
+                  Real-Time Hardware Anomaly & Tamper Detection Center
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Sub-second current sensor triggers, earthing continuity failures, and anti-theft cut-offs
+                </p>
+              </div>
+
+              <button 
+                onClick={() => setAlerts([])}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700"
+              >
+                Acknowledge All Clear
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {alerts.map((alert) => (
+                <div 
+                  key={alert.id}
+                  className={`rounded-2xl border p-4 transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
+                    alert.severity === 'critical' 
+                      ? 'bg-rose-950/20 border-rose-500/40' 
+                      : alert.severity === 'high' 
+                      ? 'bg-amber-950/20 border-amber-500/40' 
+                      : 'bg-slate-900/60 border-slate-800'
+                  }`}
+                >
+                  <div className="flex items-start gap-3.5">
+                    <div className={`p-2 rounded-xl mt-0.5 ${
+                      alert.severity === 'critical' ? 'bg-rose-500/20 text-rose-400' : 'bg-amber-500/20 text-amber-400'
+                    }`}>
+                      <AlertOctagon className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-white">{alert.type}</span>
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
+                          {alert.nodeId} • {alert.port}
+                        </span>
+                        <span className="text-[10px] text-slate-500">{alert.timestamp}</span>
+                      </div>
+                      <p className="text-xs text-slate-300 mt-1">{alert.message}</p>
+                      <p className="text-[11px] text-emerald-400 font-mono mt-1">
+                        &rarr; Action: {alert.actionRequired}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-end md:self-center">
+                    <button 
+                      onClick={() => alert(`Remote reset instruction sent to ${alert.nodeId}`)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+                    >
+                      Remote Reset
+                    </button>
+                    <button 
+                      onClick={() => setAlerts(prev => prev.filter(a => a.id !== alert.id))}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30"
+                    >
+                      Resolve
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {alerts.length === 0 && (
+                <div className="text-center py-16 bg-slate-900/30 border border-slate-800 rounded-2xl">
+                  <CheckCircle2 className="h-10 w-10 text-emerald-400 mx-auto mb-2 opacity-80" />
+                  <h3 className="text-sm font-semibold text-white">All 50 Sub-Stations Nominal</h3>
+                  <p className="text-xs text-slate-500 mt-1">No active electrical overloads or earthing faults reported across Lucknow.</p>
+                </div>
+              )}
+            </div>
+
+          </div>
+        )}
+
+      </main>
+
+      {}
+      {payoutModalKiosk && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
+                  <Send className="h-4 w-4" />
+                </div>
+                <h3 className="text-sm font-bold text-white">RazorpayX Instant Auto-Payout</h3>
+              </div>
+              <button 
+                onClick={() => setPayoutModalKiosk(null)}
+                className="text-slate-400 hover:text-white text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Recipient Shopkeeper:</span>
+                  <span className="font-semibold text-slate-200">{payoutModalKiosk.hostName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Station ID:</span>
+                  <span className="font-mono text-slate-300">{payoutModalKiosk.id}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Destination UPI ID:</span>
+                  <span className="font-mono text-cyan-300">{payoutModalKiosk.upiId}</span>
+                </div>
+                <div className="flex justify-between border-t border-slate-800 pt-1.5">
+                  <span className="text-slate-300 font-semibold">Total Settlement Amount:</span>
+                  <span className="font-mono font-bold text-emerald-400 text-sm">
+                    ₹{payoutModalKiosk.hostPayoutDue.toLocaleString('en-IN')}
+                  </span>
+                </div>
+              </div>
+
+              <div className="text-[11px] text-slate-400 leading-relaxed">
+                By triggering this, RazorpayX Payout API will execute a 24x7 IMPS/UPI fund transfer. An automated WhatsApp statement PDF will also be messaged to <strong>{payoutModalKiosk.hostPhone}</strong>.
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button
+                disabled={isProcessingPayout}
+                onClick={() => setPayoutModalKiosk(null)}
+                className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={isProcessingPayout || payoutSuccess}
+                onClick={() => handleExecuteRazorpayXPayout(payoutModalKiosk)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center gap-2 shadow-lg shadow-emerald-500/20"
+              >
+                {isProcessingPayout ? (
+                  <>
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    Calling RazorpayX API...
+                  </>
+                ) : payoutSuccess ? (
+                  <>
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Transferred & WhatsApp Sent!
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-3.5 w-3.5" />
+                    Confirm & Transfer Now
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {}
+      <footer className="border-t border-slate-800/80 bg-slate-950 px-4 lg:px-8 py-2.5 flex flex-wrap items-center justify-between text-xs text-slate-500">
+        <div className="flex items-center gap-2 font-mono text-[11px]">
+          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+          <span>EMQX MQTT Cluster: 50/50 Subscribed</span>
+          <span className="text-slate-700">•</span>
+          <span>Postgres + TimescaleDB Write Rate: 200 writes/5s</span>
+        </div>
+        <div>
+          Autonomous EV Slow Charging Network • Lucknow Region Hub
+        </div>
+      </footer>
+
+    </div>
+  );
+}
